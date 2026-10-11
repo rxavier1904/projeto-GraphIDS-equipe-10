@@ -52,9 +52,7 @@ def _attack_flows(n: int, hosts: int, num_features: int, g):
             0.05 + 0.03 * torch.randn(n_scan, num_features, generator=g),
         ]
     )
-    attack = torch.cat(
-        [torch.full((n_dos,), 1), torch.full((n_scan,), 2)]
-    ).long()
+    attack = torch.cat([torch.full((n_dos,), 1), torch.full((n_scan,), 2)]).long()
     return src, dst, attr, attack
 
 
