@@ -14,7 +14,13 @@
 
 ## Fluxo de trabalho
 
-1. Crie uma branch a partir de `main`: `f1/<tema>`, `f2/<tema>`, `f3/<tema>` ou `f4/<tema>`.
+1. Crie uma branch a partir de `main` no formato `<tipo>/resumo-da-tarefa` (kebab-case):
+   - `feat/`: nova funcionalidade (ex.: `feat/egraphsage`)
+   - `fix/`: ajuste ou correção (ex.: `fix/clip-normalizacao`)
+   - `docs/`: só documentação
+   - `refactor/`: reorganização sem mudar comportamento
+   - `test/`: só testes
+   - `chore/`: configuração, dependências, CI
 2. Commits pequenos, com mensagens em português no imperativo
    (ex.: `Implementa agregação média do E-GraphSAGE`).
 3. Abra um PR para `main`, descreva o que mudou e marque o Rafael como revisor.
