@@ -37,8 +37,9 @@ do valor publicado, ou diferença justificada no relatório.
 
 ## 3. Decisões tomadas
 
-- **Implementação do zero** em Python 3.11+, PyTorch e PyTorch Geometric (PyG) para o
-  grafo e a amostragem de vizinhança.
+- **Implementação do zero** em Python 3.10+ e PyTorch puro. A amostragem de
+  vizinhança também é nossa, sem PyTorch Geometric, o que facilita a instalação no
+  servidor do CIn.
 - **Treinamento no servidor do CIn**, operado pelo Bernardo.
 - **Novo dataset: NF-ToN-IoT-v3**. Vem do mesmo repositório da UQ dos datasets do artigo
   e tem o mesmo conjunto de 53 features NetFlow, mas cobre um ambiente IoT/IIoT com

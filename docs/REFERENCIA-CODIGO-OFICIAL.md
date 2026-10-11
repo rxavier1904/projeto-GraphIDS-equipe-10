@@ -91,6 +91,9 @@ Comuns aos quatro: nhops 1, fanout 32.768, agregação mean, 1 camada, 4 cabeça
 
 ## Pontos para discutir no relatório
 
+- Como o embedding do fluxo u→v depende só das médias de entrada de u e de v, dois
+  fluxos entre o mesmo par de hosts no mesmo batch recebem **o mesmo embedding**.
+  O fluxo só se distingue pelo efeito que causa na vizinhança do destino.
 - O alvo da reconstrução é o próprio embedding do GNN, que também está sendo treinado.
   Isso cria risco de colapso (embeddings triviais com erro zero). O weight decay alto
   no GNN e o dropout parecem segurar isso.
