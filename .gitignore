@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.ipynb_checkpoints/
+.pytest_cache/
+.ruff_cache/
+
+# Dados, caches e artefatos pesados
+data/
+*.csv
+!results/**/*.csv
+*.zip
+*.ckpt
+*.pt
+results/runs/**/scores_*.npz
+wandb/
