@@ -1,0 +1,23 @@
+# Hiperparâmetros da Tabela 14 do artigo para o NF-UNSW-NB15-v3.
+dataset: NF-UNSW-NB15-v3
+fraction: null
+drop_timestamps: true
+edim_out: 96
+nhops: 1
+fanout: 32768
+agg_type: mean
+gnn_dropout: 0.6
+num_layers: 1
+num_heads: 4
+embed_dim: 48
+ff_dim: 256
+window_size: 512
+mask_ratio: 0.15
+ae_dropout: 0.0
+learning_rate: 1.0e-4
+gnn_weight_decay: 0.6
+ae_weight_decay: 0.04
+gnn_batch_size: 16384
+ae_batch_size: 64
+num_epochs: 100
+patience: 20
