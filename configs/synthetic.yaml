@@ -1,0 +1,14 @@
+# Dataset sintético pequeno, para testar o pipeline em segundos (CPU).
+dataset: synthetic
+edim_out: 32
+gnn_dropout: 0.1
+embed_dim: 16
+window_size: 128
+ae_batch_size: 8
+gnn_batch_size: 1024
+fanout: 256
+learning_rate: 0.001
+gnn_weight_decay: 0.01
+ae_weight_decay: 0.01
+num_epochs: 30
+patience: 10

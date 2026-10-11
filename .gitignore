@@ -9,7 +9,7 @@ venv/
 .ruff_cache/
 
 # Dados, caches e artefatos pesados
-data/
+/data/
 *.csv
 !results/**/*.csv
 *.zip

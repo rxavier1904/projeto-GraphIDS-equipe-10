@@ -8,8 +8,8 @@ transforma os resultados nas tabelas do relatório.
 ## Entregas
 
 ### 3.1 Ambiente (semana 1)
-- Ambiente Python no servidor (venv, conda ou uv) com PyTorch, PyG e `pyg_lib` na versão
-  CUDA do servidor.
+- Ambiente Python no servidor (venv, conda ou uv) com PyTorch na versão CUDA do servidor
+  e `pip install -e .[dev]` (não precisa de PyTorch Geometric).
 - Documentar em `docs/SERVIDOR.md`: como acessar, carregar o ambiente, onde ficam os
   dados e como submeter jobs.
 - Script `scripts/check_env.py` que imprime a versão do CUDA, a GPU e as versões das

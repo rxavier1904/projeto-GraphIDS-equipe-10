@@ -29,8 +29,10 @@ seção 4.2 do artigo. Entrega o contrato **C1** ([CONTRATOS.md](../CONTRATOS.md
 ### 2.4 Construção do grafo: `graphids/data/graph.py` (semana 2)
 - Nós = IPs, com mapa de índices **compartilhado** entre os três splits. Arestas
   dirigidas origem→destino, uma por fluxo.
-- Um `torch_geometric.data.Data` por split, com `edge_index`, `edge_attr`,
+- Um `FlowGraph` (`graphids/data/types.py`) por split, com `edge_index`, `edge_attr`,
   `edge_label`, `edge_attack` e `attack_names` (contrato C1).
+- Implementar a leitura real dentro de `load_splits` (`graphids/data/loader.py`),
+  hoje restrita ao dataset sintético.
 - Cache em `<data_dir>/cache/<dataset>[_<fraction>]_seed<s>/`, para não reprocessar a
   cada execução.
 

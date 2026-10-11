@@ -32,3 +32,19 @@ L. Guerra, T. Chapuis, G. Duc, P. Mozharovskyi e V.-T. Nguyen, "Self-Supervised 
 of Graph Representations for Network Intrusion Detection", em *Advances in Neural
 Information Processing Systems (NeurIPS)*, vol. 38, 2025. Código oficial:
 <https://github.com/lorenzo9uerra/GraphIDS>.
+
+## Como rodar
+
+```bash
+pip install -e ".[dev]"     # instala o pacote graphids e as dependências
+pytest                      # testes com dados sintéticos (rodam em segundos, sem GPU)
+
+# treino + avaliação no dataset sintético
+python -m graphids.cli --config configs/synthetic.yaml
+
+# treino + avaliação num dataset do artigo (depois do pipeline de dados da F2)
+python -m graphids.cli --config configs/NF-UNSW-NB15-v3.yaml --seed 1 --data-dir data/
+```
+
+Cada execução grava métricas, scores e checkpoint em `results/runs/<dataset>/seed<s>/`
+(ver o [contrato C2](docs/CONTRATOS.md)).

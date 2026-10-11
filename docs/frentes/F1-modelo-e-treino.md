@@ -11,13 +11,13 @@ frentes usam e integra tudo. Também coordena a equipe e o relatório.
 ### 1.1 Esqueleto e contratos (semana 1)
 - Pacote `graphids/` com `pyproject.toml` (ou `requirements.txt`), `ruff`, `pytest` e CI
   no GitHub Actions rodando os testes sintéticos.
-- Dataclasses `DataConfig`, `ModelConfig`, `TrainConfig` e carregamento do YAML (contrato C3).
+- Dataclass `Config` e carregamento do YAML com sobrescritas `--set` (contrato C3).
 - Stub de `load_splits` que gera um grafo sintético, para todos poderem testar antes
   da F2 ficar pronta.
 
 ### 1.2 E-GraphSAGE: `graphids/models/egraphsage.py` (semana 1)
-- Camada de passagem de mensagens (`torch_geometric.nn.MessagePassing`): a mensagem é
-  a feature da aresta, agregada por **média** nos nós de destino.
+- Agregação por **média** das features das arestas que chegam em cada nó, com
+  amostragem própria limitada pelo `fanout` (`graphids/models/sampling.py`).
 - `h_v = ReLU(W_neigh · mean_{e→v} x_e)`.
 - Embedding da aresta u→v: `h_e = Dropout(W_edge · [h_u ‖ h_v])`.
 - Suporte a `nhops ≥ 1` (o artigo usa 1; mais hops ficam opcionais).
@@ -66,6 +66,12 @@ frentes usam e integra tudo. Também coordena a equipe e o relatório.
 Resumo, introdução, trabalhos relacionados, modelo de ameaça, sistema do artigo
 (com figuras e equações), discussão dos resultados nos dados do artigo, conclusão e
 revisão final.
+
+## Estado atual
+
+Implementado e testado com o dataset sintético: 1.1 a 1.6, menos o suporte a
+`nhops > 1` (o artigo usa 1 hop; fica para depois, se houver tempo). Falta a 1.7
+(integração com os dados reais da F2 e as rodadas no servidor) e o relatório.
 
 ## Testes
 - Formas dos tensores em cada componente.
