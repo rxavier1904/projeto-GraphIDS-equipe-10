@@ -6,20 +6,25 @@ combinar com o Rafael (F1), que integra o sistema.
 
 ## C1: Dados → Modelo (F2 entrega, F1 consome)
 
+Implementado em [`graphids/data/types.py`](../graphids/data/types.py). Usamos
+PyTorch puro, sem PyTorch Geometric, para simplificar a instalação no servidor.
+
 ```python
-# graphids/data/__init__.py
+# graphids/data/loader.py
 def load_splits(cfg: DataConfig) -> GraphSplits: ...
 
 @dataclass
 class GraphSplits:
-    train: torch_geometric.data.Data   # só fluxos benignos
-    val:   torch_geometric.data.Data   # benignos + ataques (rotulado)
-    test:  torch_geometric.data.Data   # benignos + ataques (rotulado)
-    feature_names: list[str]           # ordem das colunas de edge_attr
-    num_nodes: int                     # mapa de IPs compartilhado entre os splits
+    train: FlowGraph            # só fluxos benignos
+    val:   FlowGraph            # benignos + ataques (rotulado)
+    test:  FlowGraph            # benignos + ataques (rotulado)
+    feature_names: list[str]    # ordem das colunas de edge_attr
 ```
 
-Cada `Data` contém:
+Hoje `load_splits` só aceita `dataset="synthetic"`. A F2 implementa os datasets
+NetFlow reais mantendo essa assinatura.
+
+Cada `FlowGraph` contém:
 
 | Campo | Forma | Descrição |
 |---|---|---|
@@ -28,14 +33,15 @@ Cada `Data` contém:
 | `edge_label` | `[E]` long | 0 = benigno, 1 = ataque |
 | `edge_attack` | `[E]` long | índice da categoria de ataque (para análise por ataque) |
 | `attack_names` | `list[str]` | nome de cada índice de `edge_attack` |
-| `num_nodes` | int | número de hosts |
+| `num_nodes` | int | número de hosts (mesmo valor nos três splits: o mapa de IPs é compartilhado) |
 
 `DataConfig` tem os campos `dataset`, `data_dir`, `fraction` (`None` ou 0,2), `seed` e
 `drop_timestamps` (verdadeiro nos v3).
 
 ## C2: Execução → Resultados (F1 grava, F3 e F4 consomem)
 
-Cada execução de `python -m graphids.cli --config configs/<dataset>.yaml --seed <s>` grava:
+Cada execução de `python -m graphids.cli --config configs/<dataset>.yaml --seed <s>`
+grava os arquivos abaixo (implementado em `graphids/training/run.py`):
 
 ```
 results/runs/<dataset>/seed<s>/
@@ -43,6 +49,7 @@ results/runs/<dataset>/seed<s>/
   scores_val.npz   # errors, labels, attacks  (validação)
   scores_test.npz  # errors, labels, attacks  (teste)
   config.yaml      # config efetiva usada
+  history.json     # perdas e métricas de validação por época
   model.ckpt       # melhor checkpoint (fica fora do git)
 ```
 
