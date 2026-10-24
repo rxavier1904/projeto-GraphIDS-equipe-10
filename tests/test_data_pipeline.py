@@ -7,7 +7,11 @@ timestamps, Label e Attack), para testar o pipeline sem os arquivos reais.
 import numpy as np
 import pandas as pd
 import pytest
+import torch
 
+from graphids.data.cache import cache_dir, load_cache
+from graphids.data.graph import build_graphs
+from graphids.data.loader import load_splits
 from graphids.data.loading import (
     ATTACK_COL,
     IP_COLS,
@@ -16,12 +20,15 @@ from graphids.data.loading import (
     csv_path,
     load_flow_table,
 )
+from graphids.data.preprocessing import fit_scaler, transform_features
 from graphids.data.split import (
     sample_and_split,
     split_counts,
     split_indices,
     stratified_sample,
 )
+from graphids.data.types import DataConfig
+from graphids.models.sampling import NeighborhoodSampler
 
 DATASET = "NF-FAKE-v3"
 # Quantidade de fluxos por categoria. Todas têm fluxos suficientes para
@@ -179,3 +186,118 @@ def test_amostra_acontece_antes_do_split(table):
     assert max(splits.val.max(), splits.test.max()) < sampled.num_flows
     assert total < sampled.num_flows  # os ataques do treino foram removidos
     assert len(splits.train) == pytest.approx(n_benignos_treino, abs=2)
+
+
+# --- 2.3 Normalização --------------------------------------------------------
+
+
+def test_scaler_usa_so_o_treino():
+    train = np.array([[0.0, 5.0], [10.0, 5.0]], dtype=np.float32)
+    val = np.array([[5.0, 5.0], [1000.0, 5.0], [-1000.0, 5.0]], dtype=np.float32)
+    scaler = fit_scaler(train)
+    np.testing.assert_allclose(scaler.data_min_, [0.0, 5.0])
+    np.testing.assert_allclose(scaler.data_max_, [10.0, 5.0])
+    out = transform_features(scaler, val)
+    # 5 vira 0,5; valores extremos são cortados em ±10; coluna constante vira 0.
+    np.testing.assert_allclose(out[:, 0], [0.5, 10.0, -10.0])
+    np.testing.assert_allclose(out[:, 1], 0.0)
+    assert out.dtype == np.float32
+
+
+def test_normalizacao_nos_grafos(table):
+    built = build_graphs(table, split_indices(table, seed=1))
+    train = built.splits.train.edge_attr
+    assert train.min() >= 0 and train.max() <= 1
+    for g in (built.splits.val, built.splits.test):
+        assert g.edge_attr.min() >= -10 and g.edge_attr.max() <= 10
+    # O scaler foi ajustado com as linhas do treino, e só com elas.
+    rows = split_indices(table, seed=1).train
+    expected_min = table.flows[table.feature_names].to_numpy()[rows].min(0)
+    np.testing.assert_allclose(built.scaler.data_min_, expected_min)
+
+
+# --- 2.4 Grafo e cache -------------------------------------------------------
+
+
+@pytest.fixture
+def built(table):
+    return build_graphs(table, split_indices(table, seed=1))
+
+
+def test_grafos_seguem_o_contrato(built, table):
+    splits = built.splits
+    num_nodes = splits.train.num_nodes
+    sizes = split_indices(table, seed=1)
+    for name in ("train", "val", "test"):
+        g = getattr(splits, name)
+        assert g.num_nodes == num_nodes  # mapa de IPs compartilhado
+        assert g.num_edges == len(getattr(sizes, name))
+        assert g.edge_index.dtype == torch.long
+        assert g.edge_attr.dtype == torch.float32
+        assert g.edge_index.min() >= 0 and g.edge_index.max() < num_nodes
+        assert g.attack_names[0] == "Benign"
+        assert g.num_features == len(splits.feature_names)
+    assert splits.train.edge_label.sum() == 0
+    assert num_nodes == len(built.hosts)
+
+
+def test_mesmo_ip_mesmo_indice_nos_tres_splits(built, table):
+    """Cada aresta aponta para os IPs certos, com a mesma lista de hosts."""
+    sizes = split_indices(table, seed=1)
+    hosts = np.array(built.hosts)
+    for name in ("train", "val", "test"):
+        g = getattr(built.splits, name)
+        rows = getattr(sizes, name)
+        src_ips = table.flows["IPV4_SRC_ADDR"].astype(str).to_numpy()[rows]
+        dst_ips = table.flows["IPV4_DST_ADDR"].astype(str).to_numpy()[rows]
+        np.testing.assert_array_equal(hosts[g.edge_index[0].numpy()], src_ips)
+        np.testing.assert_array_equal(hosts[g.edge_index[1].numpy()], dst_ips)
+
+
+def test_categorias_de_ataque_corretas(built, table):
+    sizes = split_indices(table, seed=1)
+    g = built.splits.val
+    names = np.array(g.attack_names)
+    expected = table.flows[ATTACK_COL].astype(str).to_numpy()[sizes.val]
+    np.testing.assert_array_equal(names[g.edge_attack.numpy()], expected)
+    np.testing.assert_array_equal(g.edge_label.numpy(), (expected != "Benign"))
+
+
+def test_load_splits_com_cache(tmp_path):
+    make_fake_csv(tmp_path)
+    cfg = DataConfig(dataset=DATASET, data_dir=str(tmp_path), seed=1)
+    first = load_splits(cfg)
+    folder = cache_dir(cfg)
+    for name in ("graphs.pt", "meta.json", "hosts.txt", "scaler.pkl"):
+        assert (folder / name).is_file()
+    cached = load_cache(cfg)
+    assert cached is not None
+    for name in ("train", "val", "test"):
+        a, b = getattr(first, name), getattr(cached, name)
+        assert torch.equal(a.edge_index, b.edge_index)
+        assert torch.equal(a.edge_attr, b.edge_attr)
+        assert a.attack_names == b.attack_names and a.num_nodes == b.num_nodes
+    assert cached.feature_names == first.feature_names
+
+
+def test_pastas_de_cache_diferentes_por_config(tmp_path):
+    base = {"dataset": DATASET, "data_dir": str(tmp_path)}
+    dirs = {
+        cache_dir(DataConfig(**base, seed=1)),
+        cache_dir(DataConfig(**base, seed=2)),
+        cache_dir(DataConfig(**base, seed=1, fraction=0.2)),
+        cache_dir(DataConfig(**base, seed=1, drop_timestamps=False)),
+    }
+    assert len(dirs) == 4
+    assert cache_dir(DataConfig(**base, seed=1, fraction=0.2)).name == (
+        f"{DATASET}_0.2_seed1"
+    )
+
+
+def test_grafo_funciona_com_o_amostrador_da_f1(built):
+    """Integração com a F1: o NeighborhoodSampler aceita os grafos da F2."""
+    sampler = NeighborhoodSampler(built.splits.train, fanout=8)
+    ids = torch.arange(16)
+    node_feats, src_pos, dst_pos = sampler.batch(ids)
+    assert node_feats.shape[1] == built.splits.num_features
+    assert src_pos.shape == dst_pos.shape == (16,)

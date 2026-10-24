@@ -1,4 +1,4 @@
-"""Leitura e limpeza dos CSVs NetFlow (entrega 2.1 da F2).
+"""Leitura e limpeza dos CSVs NetFlow.
 
 Segue a Seção 4.2 do artigo e o pré-processamento do código oficial:
 

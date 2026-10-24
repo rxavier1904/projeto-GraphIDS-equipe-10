@@ -1,4 +1,4 @@
-"""Amostragem e divisão em treino, validação e teste (entrega 2.2 da F2).
+"""Amostragem e divisão em treino, validação e teste.
 
 Segue a Seção 4.2 do artigo e o código oficial:
 
