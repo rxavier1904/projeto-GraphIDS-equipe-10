@@ -47,6 +47,32 @@ A seção 6 do relatório exige estes números:
 Seção 6 (Metodologia, dados do artigo): origem dos datasets, por que foram escolhidos,
 o que representam, como os splits foram formados e as tabelas de contagem.
 
+## Estado atual
+
+Implementado e testado: 2.1 a 2.5. Arquivos em `graphids/data/`: `loading.py`,
+`split.py`, `preprocessing.py`, `graph.py`, `cache.py`, `stats.py` e o
+`load_splits` do `loader.py`, que agora aceita os datasets reais. Testes em
+`tests/test_data_pipeline.py`. Conferido no NF-UNSW-NB15-v3: 1.790.185 fluxos de
+treino, 236.542 de validação, 236.543 de teste, 44 hosts (igual à Tabela 1) e
+49 features.
+
+Falta a 2.6 (texto do relatório), que depende das tabelas de todos os datasets.
+
+## Como usar
+
+```bash
+# grafos de um dataset (lê o CSV na 1ª vez e grava o cache em data/cache/)
+python -c "from graphids.data import load_splits, DataConfig; \
+s = load_splits(DataConfig('NF-UNSW-NB15-v3', data_dir='data', seed=1)); print(s.train)"
+
+# tabelas da seção 6 (CSV + LaTeX em results/estatisticas/), uma ou mais configs
+python -m graphids.data.stats --config configs/NF-UNSW-NB15-v3.yaml --seed 1
+```
+
+As configs definem `fraction` e `drop_timestamps`, então as estatísticas saem
+exatamente com os dados que o modelo recebe. O cache fica em
+`data/cache/<dataset>[_<fraction>]_seed<s>/`; para refazer, apague a pasta.
+
 ## Testes
 - O split é estratificado e reprodutível (mesma seed, mesmos índices).
 - O treino não tem nenhum ataque.
@@ -55,3 +81,6 @@ o que representam, como os splits foram formados e as tabelas de contagem.
 
 ## Depende de
 - F3 para os CSVs no servidor (localmente, use um CSV pequeno ou sintético).
+- F3 para gerar no servidor as estatísticas dos datasets grandes
+  (NF-CSE-CIC-IDS2018 v2 e v3), que não cabem num notebook comum. Ver a
+  entrega 3.2 da F3.
