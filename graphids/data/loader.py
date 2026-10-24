@@ -4,13 +4,15 @@ from __future__ import annotations
 
 from graphids.data.cache import load_cache, save_cache
 from graphids.data.graph import build_graphs
-from graphids.data.loading import load_flow_table
+from graphids.data.loading import FlowTable, load_flow_table
 from graphids.data.split import sample_and_split
 from graphids.data.synthetic import make_synthetic_splits
 from graphids.data.types import DataConfig, GraphSplits
 
 
-def load_splits(cfg: DataConfig, use_cache: bool = True) -> GraphSplits:
+def load_splits(
+    cfg: DataConfig, use_cache: bool = True, table: FlowTable | None = None
+) -> GraphSplits:
     """Devolve os grafos de treino (só benigno), validação e teste.
 
     ``dataset="synthetic"`` gera um grafo pequeno em memória, usado nos testes e
@@ -27,6 +29,8 @@ def load_splits(cfg: DataConfig, use_cache: bool = True) -> GraphSplits:
         cfg: dataset, pasta, ``fraction``, ``seed`` e ``drop_timestamps``.
         use_cache: se verdadeiro, reaproveita ``<data_dir>/cache/...`` quando
             existir e grava o cache depois de processar (``cache.py``).
+        table: tabela já lida com ``load_flow_table``, para não ler o CSV de
+            novo (usado por ``stats.py``). Se ``None``, o CSV é lido aqui.
     """
     if cfg.dataset == "synthetic":
         return make_synthetic_splits(seed=cfg.seed)
@@ -36,7 +40,8 @@ def load_splits(cfg: DataConfig, use_cache: bool = True) -> GraphSplits:
         if cached is not None:
             return cached
 
-    table = load_flow_table(cfg.data_dir, cfg.dataset, cfg.drop_timestamps)
+    if table is None:
+        table = load_flow_table(cfg.data_dir, cfg.dataset, cfg.drop_timestamps)
     table, indices = sample_and_split(table, seed=cfg.seed, fraction=cfg.fraction)
     built = build_graphs(table, indices)
     if use_cache:

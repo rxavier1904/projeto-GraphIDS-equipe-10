@@ -27,6 +27,12 @@ from graphids.data.split import (
     split_indices,
     stratified_sample,
 )
+from graphids.data.stats import (
+    dataset_summary,
+    format_number,
+    split_class_counts,
+)
+from graphids.data.stats import main as stats_main
 from graphids.data.types import DataConfig
 from graphids.models.sampling import NeighborhoodSampler
 
@@ -301,3 +307,51 @@ def test_grafo_funciona_com_o_amostrador_da_f1(built):
     node_feats, src_pos, dst_pos = sampler.batch(ids)
     assert node_feats.shape[1] == built.splits.num_features
     assert src_pos.shape == dst_pos.shape == (16,)
+
+
+# --- 2.5 Estatísticas --------------------------------------------------------
+
+
+def test_resumo_do_dataset(table):
+    summary = dataset_summary(table, DATASET)
+    n = sum(CLASS_SIZES.values())
+    hosts = set(table.flows["IPV4_SRC_ADDR"].astype(str))
+    hosts |= set(table.flows["IPV4_DST_ADDR"].astype(str))
+    assert summary["Fluxos"] == n
+    assert summary["Hosts"] == len(hosts)
+    assert summary["Ataques (%)"] == pytest.approx(100 * (n - 800) / n, abs=0.01)
+    assert summary["Categorias de ataque"] == len(CLASS_SIZES) - 1
+    assert summary["Fluxos (artigo)"] is None  # dataset fora da Tabela 1
+
+
+def test_contagem_por_split(built):
+    counts = split_class_counts(built.splits)
+    assert counts.loc["Benign", "Treino"] == built.splits.train.num_edges
+    assert counts.loc["Ataques (total)", "Treino"] == 0
+    assert counts.loc["Total", "Validação"] == built.splits.val.num_edges
+    assert counts.loc["Total", "Teste"] == built.splits.test.num_edges
+    categorias = list(built.splits.train.attack_names)
+    por_split = counts.loc[categorias, ["Treino", "Validação", "Teste"]].sum(axis=1)
+    assert (por_split == counts.loc[categorias, "Total"]).all()
+
+
+def test_formato_brasileiro():
+    assert format_number(1790185) == "1.790.185"
+    assert format_number(5.4) == "5,40"
+    assert format_number(float("nan")) == "—"
+
+
+def test_cli_gera_csv_e_latex(tmp_path):
+    make_fake_csv(tmp_path)
+    config = tmp_path / "fake.yaml"
+    config.write_text(f"dataset: {DATASET}\n")
+    out = tmp_path / "estatisticas"
+    resumo = stats_main(
+        ["--config", str(config), "--data-dir", str(tmp_path), "--out", str(out)]
+    )
+    assert resumo.loc[DATASET, "Fluxos"] == sum(CLASS_SIZES.values())
+    for stem in (f"{DATASET}_contagem_por_split", "resumo_datasets"):
+        assert (out / f"{stem}.csv").is_file()
+        tex = (out / f"{stem}.tex").read_text()
+        assert "\\begin{tabular}" in tex and "\\bottomrule" in tex
+    assert "1.000" in (out / "resumo_datasets.tex").read_text()
