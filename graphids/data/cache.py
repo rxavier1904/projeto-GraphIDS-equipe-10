@@ -24,7 +24,7 @@ import torch
 from graphids.data.graph import BuiltDataset
 from graphids.data.types import DataConfig, FlowGraph, GraphSplits
 
-CACHE_VERSION = 1
+CACHE_VERSION = 2
 _TENSORS = ("edge_index", "edge_attr", "edge_label", "edge_attack")
 _SPLITS = ("train", "val", "test")
 

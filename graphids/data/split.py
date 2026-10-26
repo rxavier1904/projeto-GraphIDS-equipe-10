@@ -53,8 +53,8 @@ def stratified_sample(table: FlowTable, fraction: float | None, seed: int) -> Fl
         seed: semente do sorteio.
 
     Returns:
-        Nova ``FlowTable`` com os índices renumerados de 0 a E'-1 e na ordem
-        original do CSV.
+        Nova ``FlowTable`` com os índices renumerados de 0 a E'-1, na ordem
+        devolvida pelo ``groupby(...).sample`` (agrupada por ataque).
 
     Observação: categorias com pouquíssimos fluxos podem sumir da amostra
     (por exemplo, 2 fluxos × 0,2 arredonda para 0). Nos datasets do projeto
@@ -69,8 +69,11 @@ def stratified_sample(table: FlowTable, fraction: float | None, seed: int) -> Fl
     sampled = flows.groupby(ATTACK_COL, observed=True, group_keys=False).sample(
         frac=fraction, random_state=seed
     )
-    # sort_index devolve a ordem original do CSV; reset_index renumera.
-    sampled = sampled.sort_index().reset_index(drop=True)
+    # Mantém a ordem do groupby(...).sample, sem voltar à ordem do CSV: o
+    # train_test_split sorteia por posição, então reordenar a amostra mudaria
+    # o split em relação ao código oficial com a mesma seed. reset_index só
+    # renumera as linhas.
+    sampled = sampled.reset_index(drop=True)
     # Remove do tipo category os IPs e ataques que não sobraram na amostra.
     for col in sampled.select_dtypes("category").columns:
         sampled[col] = sampled[col].cat.remove_unused_categories()

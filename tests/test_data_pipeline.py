@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import pytest
 import torch
+from sklearn.model_selection import train_test_split
 
 from graphids.data.cache import cache_dir, load_cache
 from graphids.data.graph import build_graphs
@@ -192,6 +193,26 @@ def test_amostra_acontece_antes_do_split(table):
     assert max(splits.val.max(), splits.test.max()) < sampled.num_flows
     assert total < sampled.num_flows  # os ataques do treino foram removidos
     assert len(splits.train) == pytest.approx(n_benignos_treino, abs=2)
+
+
+def test_split_com_amostra_igual_ao_procedimento_oficial(table):
+    # Código oficial: groupby(Attack).sample e depois dois train_test_split
+    # sobre a amostra, na ordem em que o sample a devolve.
+    sampled, splits = sample_and_split(table, seed=3, fraction=0.5)
+    ref = table.flows.groupby(ATTACK_COL, observed=True).sample(
+        frac=0.5, random_state=3
+    )
+    train, rest = train_test_split(
+        ref, test_size=0.2, random_state=3, stratify=ref[ATTACK_COL]
+    )
+    val, test = train_test_split(
+        rest, test_size=0.5, random_state=3, stratify=rest[ATTACK_COL]
+    )
+    train = train[train[LABEL_COL] == 0]
+    # Posição na amostra -> linha original da tabela.
+    original = ref.index.to_numpy()
+    for ours, theirs in ((splits.train, train), (splits.val, val), (splits.test, test)):
+        assert np.array_equal(np.sort(original[ours]), np.sort(theirs.index))
 
 
 # --- 2.3 Normalização --------------------------------------------------------
