@@ -1,0 +1,14 @@
+Categoria,Treino,Validação,Teste,Total
+Benign,1790185,223773,223773,2237731
+Analysis,0,123,122,245
+Backdoor,0,466,466,932
+DoS,0,598,598,1196
+Exploits,0,4275,4275,8550
+Fuzzers,0,3381,3382,6763
+Generic,0,1965,1965,3930
+Reconnaissance,0,1707,1708,3415
+Shellcode,0,238,238,476
+Worms,0,16,16,32
+Ataques (total),0,12769,12770,25539
+Total,1790185,236542,236543,2263270
+Hosts com arestas,44,43,42,44

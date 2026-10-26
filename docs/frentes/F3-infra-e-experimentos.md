@@ -21,6 +21,16 @@ transforma os resultados nas tabelas do relatório.
   `NF-CICIDS2018-*`, então é preciso renomear) e NF-ToN-IoT-v3, todos de
   <https://staff.itee.uq.edu.au/marius/NIDS_datasets/>.
 - Conferir checksums e registrar o tamanho de cada arquivo.
+- **Estatísticas dos datasets (apoio à F2):** depois do download, gerar as tabelas
+  da seção 6 do relatório no servidor e fazer o commit de `results/estatisticas/`:
+  ```bash
+  python -m graphids.data.stats --seed 1 \
+      --config configs/NF-UNSW-NB15-v2.yaml --config configs/NF-UNSW-NB15-v3.yaml \
+      --config configs/NF-CSE-CIC-IDS2018-v2.yaml --config configs/NF-CSE-CIC-IDS2018-v3.yaml
+  ```
+  O comando também grava o cache dos grafos em `data/cache/`, que as rodadas de
+  treino reaproveitam. Quando a F4 criar `configs/NF-ToN-IoT-v3.yaml`, rodar de
+  novo incluindo essa config. A seed deve ser a mesma das rodadas oficiais.
 
 ### 3.3 Execução (semanas 2 e 3)
 - Script de job para o gerenciador de filas do servidor (ex.: `scripts/jobs/train.sbatch`
