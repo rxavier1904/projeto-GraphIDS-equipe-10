@@ -53,6 +53,19 @@ transforma os resultados nas tabelas do relatório.
 Seção 6 (configuração experimental: hardware, software, seeds e hiperparâmetros) e
 apoio à seção 7 com as tabelas de reprodução.
 
+## Estado atual
+
+Scripts prontos e testados localmente (sem GPU, com o dataset sintético):
+`scripts/check_env.py`, `scripts/download_datasets.sh`, `scripts/run_seeds.sh`,
+`scripts/jobs/train.sbatch` e `submit_all.sh` (SLURM, a confirmar no servidor) e
+`scripts/aggregate_results.py`, com teste em `tests/test_aggregate_results.py`.
+Guia do servidor em [SERVIDOR.md](../SERVIDOR.md), com os campos do servidor ainda
+por preencher.
+
+Falta: montar o ambiente no servidor, baixar os datasets (os links da UQ exigem o
+navegador), as estatísticas dos CIC-IDS2018, as rodadas 4 × 3 seeds, as tabelas
+finais e a seção 6 do relatório.
+
 ## Testes
 - `aggregate_results.py` testado com `metrics.json` sintéticos.
 

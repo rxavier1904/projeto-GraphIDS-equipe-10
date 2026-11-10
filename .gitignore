@@ -17,3 +17,6 @@ venv/
 *.pt
 results/runs/**/scores_*.npz
 wandb/
+
+# Logs das rodadas no servidor (F3)
+results/logs/
