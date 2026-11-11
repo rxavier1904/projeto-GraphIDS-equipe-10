@@ -1,0 +1,24 @@
+\begin{table}[ht]
+\centering
+\caption{Fluxos por categoria e split no NF-ToN-IoT-v3 (seed 1, amostra de 0.2). Os ataques que cairiam no treino são removidos, por isso o treino só tem fluxos benignos.}
+\label{tab:split-nf-ton-iot-v3}
+\begin{tabular}{lrrrr}
+\toprule
+Categoria & Treino & Validação & Teste & Total \\
+\midrule
+Benign & 2.686.754 & 335.844 & 335.845 & 3.358.443 \\
+Backdoor & 0 & 4.068 & 4.067 & 8.135 \\
+ddos & 0 & 82.825 & 82.825 & 165.650 \\
+dos & 0 & 4.069 & 4.069 & 8.138 \\
+injection & 0 & 7.635 & 7.636 & 15.271 \\
+mitm & 0 & 121 & 120 & 241 \\
+password & 0 & 31.895 & 31.896 & 63.791 \\
+ransomware & 0 & 80 & 79 & 159 \\
+scanning & 0 & 27.179 & 27.180 & 54.359 \\
+xss & 0 & 56.689 & 56.689 & 113.378 \\
+Ataques (total) & 0 & 214.561 & 214.561 & 429.122 \\
+Total & 2.686.754 & 550.405 & 550.406 & 3.787.565 \\
+Hosts com arestas & 6.278 & 1.550 & 1.575 & 7.370 \\
+\bottomrule
+\end{tabular}
+\end{table}
