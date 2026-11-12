@@ -1,4 +1,4 @@
-dataset,n_seeds,num_params_mean,num_params_std,train_time_s_mean,train_time_s_std,inference_us_per_sample_mean,inference_us_per_sample_std,peak_gpu_mem_mb_mean,peak_gpu_mem_mb_std
+dataset,n_seeds,num_params_mean,num_params_std,train_time_min_mean,train_time_min_std,inference_us_per_sample_mean,inference_us_per_sample_std,peak_gpu_mem_mb_mean,peak_gpu_mem_mb_std
 NF-UNSW-NB15-v3,3,99778.0,0.0,8.654023644307422,3.5307325352419254,0.7620913584605408,0.5729089033581075,901.15087890625,1.7599598293705243
 NF-CSE-CIC-IDS2018-v3,3,59314.0,0.0,8.688432893581274,4.092440931757766,0.4389722612973704,0.003632762672275386,1201.0397135416667,0.054585679952638924
 NF-UNSW-NB15-v2,3,93194.0,0.0,2.4692805755262572,0.9135727494668487,0.2404906031206944,0.0007992821967255836,1260.423828125,0.0

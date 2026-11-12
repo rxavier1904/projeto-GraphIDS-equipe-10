@@ -122,15 +122,18 @@ def reproduction_table(runs: pd.DataFrame, ddof: int = 1) -> pd.DataFrame:
 def cost_table(runs: pd.DataFrame, ddof: int = 1) -> pd.DataFrame:
     """Tabela de custo: média ± desvio de cada métrica de ``COST_METRICS``.
 
-    O tempo de treino sai em minutos. Colunas: ``<chave>_mean`` e ``<chave>_std``.
+    O tempo de treino sai em minutos, na coluna ``train_time_min``. Colunas:
+    ``<chave>_mean`` e ``<chave>_std``.
     """
     rows = []
     for dataset in _ordered(runs["dataset"].unique()):
         group = runs[runs["dataset"] == dataset]
         row = {"dataset": dataset, "n_seeds": len(group)}
         for key in COST_METRICS:
-            values = group[key] / 60 if key == "train_time_s" else group[key]
-            row[f"{key}_mean"], row[f"{key}_std"] = _mean_std(values, ddof)
+            values, col = group[key], key
+            if key == "train_time_s":
+                values, col = values / 60, "train_time_min"
+            row[f"{col}_mean"], row[f"{col}_std"] = _mean_std(values, ddof)
         rows.append(row)
     return pd.DataFrame(rows).set_index("dataset")
 
@@ -205,7 +208,7 @@ def reproduction_latex(table: pd.DataFrame) -> str:
 def cost_latex(table: pd.DataFrame) -> str:
     digits = {
         "num_params": 0,
-        "train_time_s": 1,
+        "train_time_min": 1,
         "inference_us_per_sample": 2,
         "peak_gpu_mem_mb": 0,
     }
