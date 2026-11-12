@@ -1,0 +1,26 @@
+# NF-ToN-IoT-v3 (novo dataset, F4). Hiperparâmetros partem da Tabela 14 do
+# artigo para o NF-UNSW-NB15-v3, mesmo conjunto de 53 features NetFlow v3.
+# fraction 0.2: o ToN-IoT-v3 tem ~27 M de fluxos (escala do CIC-IDS2018), então
+# usamos a mesma amostra estratificada de 20% que o artigo usa no CIC-IDS2018.
+dataset: NF-ToN-IoT-v3
+fraction: 0.2
+drop_timestamps: true
+edim_out: 96
+nhops: 1
+fanout: 32768
+agg_type: mean
+gnn_dropout: 0.6
+num_layers: 1
+num_heads: 4
+embed_dim: 48
+ff_dim: 256
+window_size: 512
+mask_ratio: 0.15
+ae_dropout: 0.0
+learning_rate: 1.0e-4
+gnn_weight_decay: 0.6
+ae_weight_decay: 0.04
+gnn_batch_size: 16384
+ae_batch_size: 64
+num_epochs: 100
+patience: 20
