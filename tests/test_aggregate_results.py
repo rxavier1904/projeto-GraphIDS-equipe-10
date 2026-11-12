@@ -97,7 +97,7 @@ def test_reproduction_table(agg, runs_dir):
 def test_cost_table(agg, runs_dir):
     table = agg.cost_table(agg.load_runs(runs_dir))
     v3 = table.loc["NF-UNSW-NB15-v3"]
-    assert v3["train_time_s_mean"] == pytest.approx(20.0)  # (10+20+30)/3 minutos
+    assert v3["train_time_min_mean"] == pytest.approx(20.0)  # (10+20+30)/3 minutos
     assert v3["num_params_mean"] == 570000
 
 
