@@ -1,0 +1,528 @@
+% Relatório do projeto -- CIN0114 (2026.2), Equipe 10
+% Reprodução do GraphIDS (Guerra et al., NeurIPS 2025) e avaliação no NF-ToN-IoT-v3.
+%
+% Compilação (na pasta relatorio/):
+%   latexmk -pdf main.tex
+% As tabelas em tabelas/ são geradas por gerar_tabelas.py a partir de results/.
+\documentclass[conference,a4paper]{IEEEtran}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[brazil]{babel}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{makecell}
+\usepackage{xcolor}
+\usepackage[portuguese,ruled,vlined,linesnumbered]{algorithm2e}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit,backgrounds}
+\usepackage{cite}
+\usepackage{url}
+\usepackage[hidelinks]{hyperref}
+
+\graphicspath{{figuras/}}
+\renewcommand{\topfraction}{0.9}
+\renewcommand{\dbltopfraction}{0.9}
+\renewcommand{\textfraction}{0.07}
+\renewcommand{\floatpagefraction}{0.8}
+\renewcommand{\dblfloatpagefraction}{0.8}
+
+\newcommand{\vect}[1]{\mathbf{#1}}
+\newcommand{\norm}[1]{\left\lVert #1 \right\rVert}
+
+\begin{document}
+
+\title{Reprodução e Avaliação do GraphIDS: Detecção Auto-Supervisionada de Intrusão em Rede com Grafos}
+
+\author{
+\IEEEauthorblockN{Bernardo Siqueira Batista, Danilo Regino Barrote, Felipe Maran Alves e Rafael Mendes Bezerra Xavier}
+\IEEEauthorblockA{Centro de Informática, Universidade Federal de Pernambuco, Recife, Brasil\\
+CIN0114 -- Técnicas de Ataque e Detecção de Intrusão, 2026.2 -- Equipe 10}
+}
+
+\maketitle
+
+% ----------------------------------------------------------------------------
+\begin{abstract}
+NIDS supervisionados dependem de tráfego rotulado e falham diante de ataques
+novos; métodos auto-supervisionados com redes neurais de grafos, como o
+Anomal-E, dispensam rótulos, mas separam o aprendizado de representações da
+detecção. O GraphIDS (Guerra \emph{et al.}, NeurIPS 2025) une as duas etapas: um
+E-GraphSAGE gera embeddings de fluxos NetFlow com contexto topológico e um
+autoencoder Transformer com máscara de atenção os reconstrói, treinado só com
+tráfego benigno; o erro de reconstrução é o score de anomalia. Reimplementamos o
+GraphIDS do zero em PyTorch e o avaliamos nos quatro datasets do artigo
+(NF-UNSW-NB15 e NF-CSE-CIC-IDS2018, v2 e v3) e no NF-ToN-IoT-v3. Com três seeds,
+7 das 8 métricas ficam a até dois desvios-padrão do artigo (PR-AUC de 0,9983 no
+NF-UNSW-NB15-v3). No NF-ToN-IoT-v3, o desempenho cai para PR-AUC de 0,6872 e F1
+macro de 0,6408, porque varreduras e boa parte dos ataques web e de negação de
+serviço são reconstruídos tão bem quanto o tráfego normal.
+\end{abstract}
+
+\begin{IEEEkeywords}
+detecção de intrusão, redes neurais de grafos, aprendizado auto-supervisionado,
+autoencoder mascarado, NetFlow
+\end{IEEEkeywords}
+
+% ----------------------------------------------------------------------------
+\section{Introdução}
+
+Investigamos a detecção de intrusões a partir de registros de fluxo (NetFlow):
+dado o tráfego entre hosts, decidir quais fluxos pertencem a um ataque, sem
+depender de rótulos de ataque. O problema é relevante porque ataques novos surgem
+continuamente e rotular tráfego é caro; NIDS supervisionados reconhecem bem o que
+viram no treino, mas generalizam mal para ataques
+desconhecidos~\cite{sommer2010outside,maseer2021benchmarking}.
+
+As soluções existentes têm limitações claras. Detectores de anomalia clássicos e
+autoencoders sobre fluxos isolados~\cite{he2003cblof,liu2008iforest,mirsky2018kitsune}
+ignoram a estrutura de comunicação entre hosts, que caracteriza varreduras e
+ataques distribuídos. GNNs como o E-GraphSAGE~\cite{lo2022egraphsage} exploram
+essa estrutura, mas são supervisionadas. O Anomal-E~\cite{caville2022anomale}
+dispensa rótulos com um pré-treino contrastivo, porém separa representação e
+detecção e depende de amostras negativas artificiais. Por isso o artigo de
+referência~\cite{guerra2025graphids} propõe o GraphIDS, que treina de ponta a
+ponta um GNN e um autoencoder Transformer para reconstruir representações de
+tráfego benigno, de modo que os embeddings são otimizados para a própria
+detecção.
+
+Este trabalho reproduz o GraphIDS e testa sua generalização num ambiente novo.
+As contribuições são:
+\begin{itemize}
+  \item uma reimplementação do zero, comentada e testada, em PyTorch puro, sem
+        DGL nem PyTorch Geometric~\cite{equipe10_repo};
+  \item a reprodução nos quatro datasets do artigo com três seeds, com 7 das 8
+        métricas a até dois desvios-padrão dos valores publicados;
+  \item a primeira avaliação do GraphIDS no NF-ToN-IoT-v3, com análise por
+        categoria de ataque que expõe limitações do método.
+\end{itemize}
+
+% ----------------------------------------------------------------------------
+\section{Trabalhos relacionados}
+
+\textbf{Modelagem mascarada.} BERT~\cite{devlin2019bert}, MAE~\cite{he2022mae} e
+GraphMAE~\cite{hou2022graphmae} aprendem representações reconstruindo partes
+mascaradas da entrada; como anomalias são mal reconstruídas, a ideia foi
+adaptada à detecção de anomalias, por exemplo em logs~\cite{guo2021logbert}.
+Nenhum deles trata dados em que a informação está nas arestas.
+
+\textbf{GNNs supervisionadas.} O GraphSAGE~\cite{hamilton2017graphsage} é
+indutivo e o E-GraphSAGE~\cite{lo2022egraphsage} acrescenta features de aresta,
+classificando fluxos NetFlow com alto desempenho. Friji \emph{et
+al.}~\cite{friji2023flowgraph} modelam fluxos como nós e Zhou \emph{et
+al.}~\cite{zhou2020botnet} detectam botnets só pela topologia. Todos exigem
+tráfego rotulado.
+
+\textbf{Métodos auto-supervisionados.} O Anomal-E~\cite{caville2022anomale}
+pré-treina um E-GraphSAGE com Deep Graph Infomax~\cite{velickovic2019dgi} e
+aplica detectores clássicos aos embeddings, em duas etapas independentes. O
+Kitsune~\cite{mirsky2018kitsune} e o SAFE~\cite{li2025safe} usam autoencoders
+sem contexto topológico, e o SAFE perde muito desempenho nos datasets maiores
+(Tabela~\ref{tab:reproducao}).
+
+% ----------------------------------------------------------------------------
+\section{Modelo de ameaça}
+
+O defensor observa a rede num ponto de agregação que exporta NetFlow para um
+coletor, sobre o qual roda o GraphIDS (Figura~\ref{fig:ameaca}). O atacante é
+externo ou controla um host interno comprometido. O tráfego é um grafo dirigido
+$G=(V,E)$: cada nó é um IP e cada aresta $(u,v)$ é um fluxo com features
+$\vect{x}_{uv}\in\mathbb{R}^F$. Com os graus $d^{-}(v)=|\{(u,v)\in E\}|$ e
+$d^{+}(u)=|\{(u,v)\in E\}|$, as famílias de ataque dos datasets deixam
+assinaturas distintas:
+
+\begin{itemize}
+  \item \emph{Varredura} (Reconnaissance, scanning): $d^{+}(a)\gg\mathbb{E}[d^{+}]$
+        para o atacante $a$, com fluxos curtos para muitos destinos ou portas.
+  \item \emph{DoS/DDoS}: origens $S$ enviam fluxos a uma vítima $v$ em alta taxa,
+        com $|S|=1$ (DoS) ou $|S|\gg1$ (DDoS), elevando $d^{-}(v)$.
+  \item \emph{Força bruta} (SSH, FTP, password): muitos fluxos quase idênticos,
+        $\vect{x}_{av}\approx\vect{x}'_{av}$, no mesmo par e porta.
+  \item \emph{Aplicação} (injection, XSS, Exploits): conexão igual à de um
+        cliente legítimo; a diferença só aparece indiretamente nas features.
+  \item \emph{Comprometimento} (Infiltration, Backdoor, Bot, ransomware, MITM):
+        um host interno ganha arestas novas (comando e controle, varredura
+        interna); quando imita o tráfego normal, a assinatura é fraca.
+\end{itemize}
+
+\begin{figure}[!t]
+\centering
+\begin{tikzpicture}[
+  font=\scriptsize,
+  host/.style={draw, rounded corners=2pt, minimum width=0.9cm, minimum height=0.45cm, fill=blue!6},
+  bad/.style={draw, rounded corners=2pt, minimum width=0.9cm, minimum height=0.45cm, fill=red!12},
+  box/.style={draw, rounded corners=2pt, align=center, fill=gray!8},
+  >=Stealth]
+  \node[bad] (ext) at (0,1.6) {Atacante};
+  \node[box, minimum width=1.2cm] (inet) at (0,0.5) {Internet};
+  \node[box, minimum width=1.7cm] (rt) at (2.1,0.5) {Roteador /\\exportador NetFlow};
+  \node[host] (h1) at (4.3,1.5) {Host A};
+  \node[host] (h2) at (4.3,0.85) {Host B};
+  \node[host] (h3) at (4.3,0.2) {Servidor};
+  \node[bad]  (h4) at (4.3,-0.45) {Host comp.};
+  \node[box, minimum width=1.6cm] (col) at (2.1,-1.0) {Coletor de\\fluxos};
+  \node[box, minimum width=1.6cm, fill=green!10] (ids) at (0,-1.0) {GraphIDS\\(score + limiar)};
+  \draw[->, red!70!black, thick] (ext) -- (inet);
+  \draw[<->] (inet) -- (rt);
+  \foreach \h in {h1,h2,h3,h4} \draw[<->] (rt.east) -- (\h.west);
+  \draw[->, red!70!black, thick, dashed] (h4.east) to[bend right=50] node[right, font=\tiny, align=left]{mov.\\lateral} (h1.east);
+  \draw[->, dashed] (rt) -- node[right]{fluxos} (col);
+  \draw[->] (col) -- (ids);
+  \begin{scope}[on background layer]
+    \node[draw, dotted, inner sep=4pt, fit=(rt)(h1)(h4)(col), label={[font=\tiny]below:rede monitorada}] {};
+  \end{scope}
+\end{tikzpicture}
+\caption{Modelo de ameaça: ataques externos ou a partir de um host comprometido geram fluxos que passam pelo ponto de observação e são analisados pelo GraphIDS.}
+\label{fig:ameaca}
+\end{figure}
+
+\textbf{Premissas.} (P1) o atacante alcança a rede ou controla um host interno;
+(P2) o tráfego de ataque passa pelo ponto de observação; (P3) os IPs identificam
+os hosts de forma estável (sem NAT ou \emph{spoofing} sistemático); (P4) o treino
+contém só tráfego benigno, sem envenenamento; (P5) o atacante não adapta o
+tráfego para evadir o modelo; (P6) há uma pequena validação rotulada para
+escolher o checkpoint e o limiar.
+
+% ----------------------------------------------------------------------------
+\section{Sistema proposto pelo artigo de referência}
+
+O GraphIDS~\cite{guerra2025graphids} tem quatro componentes
+(Figura~\ref{fig:arquitetura}).
+
+\begin{figure*}[!t]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+  font=\footnotesize,
+  blk/.style={draw, rounded corners=3pt, align=center, minimum height=1.05cm, inner sep=3pt, fill=gray!7},
+  gnn/.style={blk, fill=blue!8},
+  tr/.style={blk, fill=orange!10},
+  outb/.style={blk, fill=green!10},
+  >=Stealth, node distance=0.55cm]
+  \node[blk] (csv) {Fluxos NetFlow\\$\{(u,v,\vect{x}_{uv})\}$};
+  \node[blk, right=of csv] (pre) {Limpeza, split\\80/10/10 e\\Min-Max};
+  \node[blk, right=of pre] (graph) {Grafo dirigido\\hosts = nós\\fluxos = arestas};
+  \node[gnn, right=of graph] (sage) {E-GraphSAGE\\(1 salto, \emph{fanout} $K$)\\$\vect{h}_{uv}\in\mathbb{R}^{d_{gnn}}$};
+  \node[tr, right=of sage] (proj) {Projeção\\$\mathbb{R}^{d_{gnn}}\!\to\!\mathbb{R}^{d_{model}}$\\janelas de 512};
+  \node[tr, right=of proj] (encdec) {Encoder + decoder\\Transformer\\(máscara $\vect{M}$ no treino)};
+  \node[outb, right=of encdec] (score) {$s_i=\norm{\vect{h}_i-\hat{\vect{h}}_i}^2$\\ataque se $s_i>\tau$};
+  \draw[->] (csv) -- (pre);
+  \draw[->] (pre) -- (graph);
+  \draw[->] (graph) -- (sage);
+  \draw[->] (sage) -- (proj);
+  \draw[->] (proj) -- (encdec);
+  \draw[->] (encdec) -- (score);
+  \draw[->, dashed, red!70!black] (score.south) -- ++(0,-0.45) -| node[pos=0.25, below, font=\scriptsize]{gradiente de $\mathcal{L}_{MSE}$ (treino só com fluxos benignos)} (sage.south);
+\end{tikzpicture}}
+\caption{Arquitetura do GraphIDS. O gradiente do erro de reconstrução atualiza juntos o E-GraphSAGE e o Transformer.}
+\label{fig:arquitetura}
+\end{figure*}
+
+\textbf{Construção do grafo.} \emph{Entrada:} tabela de fluxos; \emph{saída:} um
+grafo dirigido por partição (treino, validação, teste), com IPs como nós e as
+demais colunas NetFlow como features de aresta.
+
+\textbf{E-GraphSAGE.} \emph{Entrada:} um lote de arestas e sua vizinhança
+amostrada; \emph{saída:} um embedding por fluxo. Com um salto e agregação por
+média~\cite{lo2022egraphsage}:
+\begin{align}
+\vect{a}_w &= \frac{1}{|\mathcal{N}_K(w)|}\sum_{(z,w)\in\mathcal{N}_K(w)} \vect{x}_{zw}, \label{eq:agg}\\
+\vect{h}_w &= \mathrm{ReLU}\left(\vect{W}_n\vect{a}_w+\vect{b}_n\right),\\
+\vect{h}_{uv} &= \mathrm{Dropout}\left(\vect{W}_e\left[\vect{h}_u \,\Vert\, \vect{h}_v\right]+\vect{b}_e\right), \label{eq:edge}
+\end{align}
+em que $\mathcal{N}_K(w)$ são até $K=32.768$ arestas que chegam em $w$. O modelo
+é indutivo (gera embeddings para hosts não vistos) e o salto único basta para
+capturar o contexto local; o padrão global fica com o Transformer.
+
+\textbf{Autoencoder Transformer com máscara.} \emph{Entrada:} embeddings
+embaralhados em janelas de até 512 fluxos (64 janelas por lote); \emph{saída:}
+reconstruções $\hat{\vect{h}}_i$. Os embeddings são projetados para
+$d_{model}$, passam por encoder e decoder (o decoder usa a mesma sequência como
+consulta e faz atenção cruzada sobre o encoder) e voltam ao espaço do GNN. Não há
+codificação posicional, pois o modelo aprende coocorrência, não sequência. No
+treino, uma máscara simétrica $M_{ij}=M_{ji}\sim\mathrm{Bernoulli}(\rho)$, com
+$\rho=0{,}15$, desliga ligações de atenção:
+\begin{equation}
+\mathrm{Att}=\mathrm{softmax}\left(\frac{\vect{Q}\vect{K}^\top}{\sqrt{d_k}}+\vect{A}\right)\vect{V},\ \
+A_{ij}=\begin{cases}-\infty, & M_{ij}=1\\ 0, & M_{ij}=0\end{cases}
+\end{equation}
+Nenhum token é removido: a máscara é um \emph{dropout} estruturado que obriga a
+reconstruir a partir de contexto parcial, e é desligada na inferência.
+
+\textbf{Score, perda e limiar.} O score é o erro quadrático de reconstrução, e a
+perda é sua média sobre as posições válidas:
+\begin{equation}
+s_i=\norm{\vect{h}_i-\hat{\vect{h}}_i}_2^2,\qquad
+\mathcal{L}_{MSE}=\frac{1}{n_{valid}}\sum_{i=1}^{n_{valid}} s_i. \label{eq:loss}
+\end{equation}
+O gradiente atravessa o Transformer e o GNN (Algoritmo~\ref{alg:treino}),
+alinhando representação e detecção; a regularização forte no GNN (weight decay
+de 0,6) evita o colapso para embeddings triviais. O limiar $\tau^\ast$ é o que
+maximiza o F1 macro entre 500 valores igualmente espaçados nos scores de
+validação, e é aplicado ao teste sem consultá-lo.
+
+\begin{algorithm}[t]
+\small
+\caption{Treino do GraphIDS}
+\label{alg:treino}
+\KwIn{grafos de treino (benigno) e de validação}
+\KwOut{parâmetros $\theta$ e limiar $\tau^\ast$}
+\For{época $=1,\dots,100$}{
+  \ForEach{lote de arestas do treino}{
+    $\vect{h}\leftarrow$ E-GraphSAGE com vizinhança amostrada\;
+    agrupar em janelas de 512 e sortear a máscara $\vect{M}$\;
+    $\hat{\vect{h}}\leftarrow$ Transformer$(\vect{h};\vect{M})$\;
+    atualizar GNN e Transformer com $\nabla\mathcal{L}_{MSE}$ (AdamW)\;
+  }
+  salvar $\theta$ se a PR-AUC de validação melhorou\;
+  \lIf{20 épocas sem melhora}{parar}
+}
+$\tau^\ast\leftarrow\arg\max_\tau \mathrm{F1}_{macro}$ na validação\;
+\end{algorithm}
+
+% ----------------------------------------------------------------------------
+\section{Solução proposta pela equipe}
+
+A proposta de melhoria é opcional e não foi realizada: o esforço foi dedicado à
+reimplementação, à reprodução e à avaliação no novo dataset. A
+Seção~\ref{sec:conclusao} indica as modificações que os resultados sugerem.
+
+% ----------------------------------------------------------------------------
+\section{Metodologia}
+
+\subsection{Dados do artigo de referência}
+
+O artigo usa as versões NetFlow do UNSW-NB15~\cite{moustafa2015unsw} e do
+CSE-CIC-IDS2018~\cite{sharafaldin2018cicids}, publicadas pela Universidade de
+Queensland~\cite{uq_nids}. Elas foram escolhidas por virem de ambientes
+distintos e terem um conjunto padronizado de features com os IPs, o que permite
+montar os grafos~\cite{sarhan2021standard}. A v2 tem 43 features e a v3
+acrescenta 10 temporais~\cite{luay2025temporal}. O UNSW-NB15 representa uma rede
+pequena (44 hosts) com nove categorias de ataque; o CSE-CIC-IDS2018, uma
+infraestrutura grande na AWS, com 14 categorias (força bruta, DoS/DDoS, Bot,
+Infiltration e ataques web). Nossas estatísticas (Tabela~\ref{tab:datasets})
+batem com a Tabela~1 do artigo.
+
+\begin{table}[!t]
+\centering
+\caption{Datasets completos e fração estratificada usada nos experimentos.}
+\label{tab:datasets}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\input{tabelas/datasets.tex}
+\end{table}
+
+\textbf{Formação dos conjuntos.} Seguimos o artigo: valores inválidos viram
+zero; IPs e, nos v3, timestamps saem das features; no CSE-CIC-IDS2018 usa-se uma
+amostra de 20\% estratificada por categoria (como no artigo); o split é
+estratificado em 80/10/10; os ataques do treino são descartados; e o Min-Max é
+ajustado no treino benigno. As Tabelas~\ref{tab:contagens_unsw}
+e~\ref{tab:contagens_cic} trazem as contagens por categoria (seed~1). Nos UNSW
+completos, os ataques descartados do treino somam 76.042 (v2) e 102.154 (v3)
+fluxos.
+
+\begin{table*}[!t]
+\centering
+\caption{Desempenho no teste (média $\pm$ desvio entre seeds). As linhas acima da nossa são da Tabela 3 de Guerra \emph{et al.}~\cite{guerra2025graphids}.}
+\label{tab:reproducao}
+\footnotesize
+\input{tabelas/reproducao.tex}
+\end{table*}
+
+\begin{table*}[!t]
+\centering
+\caption{Fluxos por categoria e partição nos datasets NF-UNSW-NB15 (seed 1). O treino só tem benignos.}
+\label{tab:contagens_unsw}
+\footnotesize
+\input{tabelas/contagens_unsw.tex}
+\end{table*}
+
+\begin{table*}[!t]
+\centering
+\caption{Fluxos por categoria e partição nos datasets NF-CSE-CIC-IDS2018, após a amostra de 20\% (seed 1).}
+\label{tab:contagens_cic}
+\footnotesize
+\input{tabelas/contagens_cic.tex}
+\end{table*}
+
+\subsection{Outro conjunto de dados: NF-ToN-IoT-v3}
+
+Escolhemos o NF-ToN-IoT-v3, versão NetFlow do TON\_IoT~\cite{moustafa2021toniot},
+por três motivos: tem as mesmas 53 features v3, então o pipeline roda sem
+adaptação e a comparação isola o efeito do ambiente; representa um ambiente
+IoT/IIoT, diferente das redes corporativas do artigo; e traz ataques pouco
+cobertos pelo artigo (ransomware, injection, XSS, MITM, password), com 38,98\%
+de ataques. Essa prevalência é a PR-AUC de um classificador aleatório, contra
+0,04 a 0,13 nos datasets do artigo. Pela escala (27,5 milhões de fluxos), usamos
+a mesma amostra de 20\% e o mesmo protocolo (Tabela~\ref{tab:contagens_ton}).
+
+\begin{table}[!t]
+\centering
+\caption{Fluxos por categoria e partição no NF-ToN-IoT-v3, após a amostra de 20\% (seed 1).}
+\label{tab:contagens_ton}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\input{tabelas/contagens_ton.tex}
+\end{table}
+
+
+
+
+
+\begin{table}[!t]
+\centering
+\caption{Custo computacional (média $\pm$ desvio), comparado com a Tabela 2 do artigo. A memória de GPU ficou entre 0,9 e 1,3 GB.}
+\label{tab:custo}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\input{tabelas/custo.tex}
+\end{table}
+
+\subsection{Métricas e experimentos}
+
+Usamos as métricas do artigo: PR-AUC (\emph{average precision},
+$\mathrm{AP}=\sum_k(R_k-R_{k-1})P_k$) e F1 macro no limiar $\tau^\ast$, além da
+taxa de detecção por categoria, $\mathrm{DR}_c=\mathrm{TP}_c/N_c$, e da taxa de
+falso positivo, $\mathrm{FPR}=\mathrm{FP}/N_{benigno}$~\cite{saito2015precision}.
+Cada dataset foi rodado com as seeds 1, 2 e 3 e os hiperparâmetros da Tabela~14
+do artigo; o NF-ToN-IoT-v3 herdou a configuração do NF-UNSW-NB15-v3, sem
+ajuste. O critério de reprodução é ficar a até dois desvios-padrão do valor
+publicado. Os baselines vêm da Tabela~3 do artigo, sem reexecução. Os
+experimentos rodaram em GPUs NVIDIA A100 do cluster SLURM do CIn-UFPE, com
+PyTorch 2.14.1. Em vez de usar DGL, nossa amostragem de vizinhança pré-calcula a
+média da Eq.~(\ref{eq:agg}).
+
+% ----------------------------------------------------------------------------
+
+
+\begin{table}[!t]
+\centering
+\caption{Taxa de detecção (\%) por categoria no NF-ToN-IoT-v3.}
+\label{tab:det_ton}
+\footnotesize
+\input{tabelas/deteccao_ton.tex}
+\end{table}
+
+\section{Resultados e discussões}
+
+\subsection{Solução do artigo nos dados do artigo}
+
+A Tabela~\ref{tab:reproducao} compara nossa reprodução com o artigo e seus
+baselines. O critério é atendido em 7 das 8 métricas. A exceção é a PR-AUC do
+NF-UNSW-NB15-v3 (0,9983 contra 0,9998): apenas 0,0015 abaixo, mas fora dos dois
+desvios porque o desvio publicado é de 0,0007. No NF-CSE-CIC-IDS2018-v2 superamos
+o artigo (0,9344 contra 0,9201). As maiores diferenças vêm da variância entre
+seeds: no NF-UNSW-NB15-v2, uma seed teve PR-AUC de 0,6275 e as outras, 0,8606 e
+0,8153.
+
+A reprodução confirma a conclusão do artigo: nos v3, o GraphIDS supera com folga
+os baselines externos (no CSE-CIC-IDS2018-v3, 0,8714 de PR-AUC contra 0,6294 do
+SAFE e 0,2555 do Anomal-E), o que mostra o ganho de otimizar os embeddings para a
+detecção. Nos v2, fica próximo do Anomal-E.
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=0.49\columnwidth]{NF-UNSW-NB15-v3_pr.pdf}\hfill
+\includegraphics[width=0.49\columnwidth]{NF-CSE-CIC-IDS2018-v3_pr.pdf}\\[2pt]
+\includegraphics[width=0.49\columnwidth]{NF-UNSW-NB15-v2_pr.pdf}\hfill
+\includegraphics[width=0.49\columnwidth]{NF-CSE-CIC-IDS2018-v2_pr.pdf}
+\caption{Curvas precisão-revocação no teste, uma por seed.}
+\label{fig:pr}
+\end{figure}
+
+\begin{table}[!t]
+\centering
+\caption{FPR e categorias com detecção média abaixo de 99\% no teste (média $\pm$ desvio entre seeds).}
+\label{tab:det_artigo}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\input{tabelas/deteccao_artigo.tex}
+\end{table}
+
+\textbf{Por categoria} (Figura~\ref{fig:pr} e Tabela~\ref{tab:det_artigo}). No
+NF-UNSW-NB15-v3 todas as categorias são detectadas em 100\%, com FPR de 0,003\%.
+No v2, todas passam de 99\%, mas a FPR de 1,4\% gera cerca de 3.200 falsos
+positivos para 9.506 ataques no teste e derruba a precisão, o que explica a
+PR-AUC menor, como o artigo também observa. No CSE-CIC-IDS2018, a perda se
+concentra na Infiltration (7\% e 27\% de detecção, contra 18\% e 25\% no artigo),
+cujo tráfego imita o normal, e no Bot, detectado por completo em algumas seeds e
+quase nada em outras, sinal de que o limiar fica muito perto dos seus scores.
+
+\textbf{Custo.} A Tabela~\ref{tab:custo} mostra que nosso modelo tem cerca de um
+décimo dos parâmetros reportados e treina em minutos em vez de horas, com
+memória de GPU semelhante e inferência de 0,24 a 0,82~$\mu$s por fluxo (2,27 a
+5,09~$\mu$s no artigo). Não identificamos a causa da diferença de
+parâmetros, mas ela não afetou o desempenho.
+
+\subsection{Solução do artigo no NF-ToN-IoT-v3}
+
+O GraphIDS obtém PR-AUC de $0{,}6872\pm0{,}0192$ e F1 macro de
+$0{,}6408\pm0{,}1488$. A PR-AUC é 1,8 vez a de um classificador aleatório (0,3898, a prevalência no teste),
+contra 6,7 a 19,3 vezes nos datasets do artigo. Não há resultados publicados
+neste dataset para comparação. Backdoor e ransomware são sempre detectados, mas
+scanning (4\%) e MITM, DoS, XSS, password e DDoS (34\% a 50\%) ficam bem abaixo,
+com FPR de 9,9\% (Tabela~\ref{tab:det_ton}).
+
+\begin{figure*}[!t]
+\centering
+\begin{minipage}[b]{0.36\textwidth}
+\centering
+\includegraphics[width=\linewidth]{NF-ToN-IoT-v3_scores.pdf}\\
+\scriptsize (a)
+\end{minipage}\hfill
+\begin{minipage}[b]{0.6\textwidth}
+\centering
+\includegraphics[width=\linewidth]{NF-ToN-IoT-v3_treino.pdf}\\
+\scriptsize (b)
+\end{minipage}\\[4pt]
+\includegraphics[width=0.85\textwidth]{NF-ToN-IoT-v3_tsne.pdf}\\
+\scriptsize (c)
+\caption{NF-ToN-IoT-v3: (a) score por categoria no teste, com o limiar (seed 3); (b) perdas e PR-AUC de validação por época; (c) t-SNE~\cite{vandermaaten2008tsne} das features, dos embeddings do E-GraphSAGE e da saída do encoder (seed 1).}
+\label{fig:ton}
+\end{figure*}
+
+Os resultados apontam três causas. (1) \emph{Desalinhamento entre reconstrução e
+detecção:} a perda cai durante todo o treino, mas a PR-AUC de validação atinge o
+máximo entre as épocas 1 e 6 e depois cai (Figura~\ref{fig:ton}b); o modelo passa
+a reconstruir bem também os ataques, e o scanning chega a ter score menor que o
+benigno (Figura~\ref{fig:ton}a). (2) \emph{Ataques e benignos compartilham
+hosts:} há só 6.355 hosts para 2,7 milhões de fluxos de treino e, pelas
+Eqs.~(\ref{eq:agg})--(\ref{eq:edge}), o embedding de um fluxo depende das médias
+de vizinhança dos dois hosts, em que a feature do próprio fluxo entra diluída;
+o t-SNE (Figura~\ref{fig:ton}c) mostra categorias bem agrupadas nas features
+brutas e muito mais misturadas nos embeddings. (3) \emph{Sem ajuste de
+hiperparâmetros}, ao contrário do artigo, que otimiza cada dataset. A alta
+prevalência de ataques também enfraquece a premissa de que anomalias são raras.
+
+\subsection{Proposta da equipe}
+
+Não há resultados de uma versão modificada, pois a melhoria não foi realizada.
+
+% ----------------------------------------------------------------------------
+\section{Conclusão e trabalhos futuros}
+\label{sec:conclusao}
+
+Reimplementamos o GraphIDS e reproduzimos seus resultados nos quatro datasets do
+artigo, com 7 das 8 métricas a até dois desvios-padrão e com um modelo menor e
+mais rápido. No NF-ToN-IoT-v3, o desempenho cai bastante (PR-AUC de 0,6872).
+
+As principais limitações do método são: o limiar e o \emph{early stopping}
+dependem de validação rotulada; a reconstrução não garante separação quando os
+ataques são frequentes ou regulares; o embedding do fluxo depende só da
+vizinhança dos hosts, o que prejudica ataques que compartilham hosts com o
+tráfego normal (Infiltration, ToN-IoT); e não há avaliação contra mudanças de
+distribuição, evasão ou envenenamento (P4 e P5). Do nosso lado, usamos três
+seeds, não reexecutamos os baselines e não ajustamos o NF-ToN-IoT-v3.
+
+Como trabalhos futuros, propomos: ajustar os hiperparâmetros do NF-ToN-IoT-v3
+pela PR-AUC de validação; concatenar $\vect{x}_{uv}$ a
+$[\vect{h}_u\Vert\vect{h}_v]$ na Eq.~(\ref{eq:edge}); usar limiar e critério de
+parada não supervisionados; e avaliar a robustez a ataques adaptativos.
+
+% ----------------------------------------------------------------------------
+\bibliographystyle{IEEEtran}
+\bibliography{referencias}
+
+\end{document}
