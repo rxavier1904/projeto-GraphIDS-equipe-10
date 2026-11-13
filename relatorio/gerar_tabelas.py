@@ -199,54 +199,6 @@ def tabela_contagens_ton() -> None:
     gravar("contagens_ton", out)
 
 
-def _lr(v: float) -> str:
-    """Taxa de aprendizado em notação científica, por exemplo 1,1e-05."""
-    mant, exp = f"{float(v):.1e}".split("e")
-    return f"${mant} \\times 10^{{{int(exp)}}}$"
-
-
-def _cabecalho_curto(d: str) -> str:
-    """Nome do dataset quebrado em duas linhas, por exemplo UNSW-NB15 / v3."""
-    nome, versao = CURTO[d].rsplit("-", 1)
-    return f"\\makecell{{{nome}\\\\{versao}}}"
-
-
-def tabela_hiperparametros() -> None:
-    import yaml  # dependência do projeto (pyyaml)
-
-    cfgs = {
-        d: yaml.safe_load((RAIZ / "configs" / f"{d}.yaml").read_text(encoding="utf-8"))
-        for d in [*ARTIGO, NOVO]
-    }
-    linhas = [
-        ("edim\\_out", "edim_out", str),
-        ("dropout do GNN", "gnn_dropout", str),
-        ("embed\\_dim", "embed_dim", str),
-        ("ff\\_dim", "ff_dim", str),
-        ("dropout do AE", "ae_dropout", str),
-        ("taxa de aprendizado", "learning_rate", _lr),
-        ("weight decay do GNN", "gnn_weight_decay", str),
-        ("weight decay do AE", "ae_weight_decay", str),
-        ("lote do GNN", "gnn_batch_size", milhar),
-        ("fraction", "fraction", lambda v: "--" if v is None else str(v)),
-    ]
-    out = [
-        r"\begin{tabular}{lrrrrr}",
-        r"\toprule",
-        "Parâmetro & " + " & ".join(
-            _cabecalho_curto(d) for d in [*ARTIGO, NOVO])
-        + r" \\",
-        r"\midrule",
-    ]  # fmt: skip
-    for rotulo, chave, fmt in linhas:
-        vals = [fmt(cfgs[d].get(chave)).replace(".", "{,}") for d in [*ARTIGO, NOVO]]
-        if chave == "gnn_batch_size":
-            vals = [milhar(cfgs[d][chave]) for d in [*ARTIGO, NOVO]]
-        out.append(f"{rotulo} & " + " & ".join(vals) + r" \\")
-    out += [r"\bottomrule", r"\end{tabular}"]
-    gravar("hiperparametros", out)
-
-
 def tabela_reproducao() -> None:
     nosso = {r["dataset"]: r for r in ler_csv(RESULTS / "tabela_reproducao.csv")}
     out = [
@@ -257,13 +209,12 @@ def tabela_reproducao() -> None:
         r"Modelo / métrica & UNSW-NB15 & CIC-IDS2018 & UNSW-NB15 & CIC-IDS2018 \\",
         r"\midrule",
     ]
-    for modelo, por_ds in TABELA3.items():
+    for modelo in ("SAFE", "Anomal-E", "SimpleAE", "GraphIDS (artigo)"):
+        por_ds = TABELA3[modelo]
         for i, metrica in enumerate(("PR-AUC", "F1 macro")):
             cel = [pm(por_ds[d][2 * i], por_ds[d][2 * i + 1]) for d in ARTIGO]
             rot = f"{modelo} -- {metrica}"
             out.append(f"{rot} & " + " & ".join(cel) + r" \\")
-        if modelo == "SAFE" or modelo == "SimpleAE":
-            out.append(r"\midrule")
     out.append(r"\midrule")
     for metrica, m, s in (("PR-AUC", "pr_auc_mean", "pr_auc_std"),
                           ("F1 macro", "f1_macro_mean", "f1_macro_std")):  # fmt: skip
@@ -302,33 +253,6 @@ def tabela_por_seed() -> None:
             out.append(r"\midrule")
     out += [r"\bottomrule", r"\end{tabular}"]
     gravar("por_seed", out)
-
-
-def tabela_ton() -> None:
-    nosso = {r["dataset"]: r for r in ler_csv(RESULTS / "tabela_reproducao.csv")}
-    resumo = {r["Dataset"]: r for r in ler_csv(
-        RESULTS / "estatisticas" / "resumo_datasets.csv")}  # fmt: skip
-    out = [
-        r"\begin{tabular}{lccc}",
-        r"\toprule",
-        r"Dataset & PR-AUC & F1 macro & \makecell{PR-AUC de\\referência$^\ast$} \\",
-        r"\midrule",
-    ]
-    for d in [*ARTIGO, NOVO]:
-        r = nosso[d]
-        if d == NOVO:
-            out.append(r"\midrule")
-        # Linha de base da PR-AUC = prevalência de ataques no teste.
-        cont = {c["Categoria"]: c for c in _contagens(d)}
-        prev = int(cont["Ataques (total)"]["Teste"]) / int(cont["Total"]["Teste"])
-        out.append(
-            f"{CURTO[d]} & {pm(float(r['pr_auc_mean']), float(r['pr_auc_std']))} & "
-            f"{pm(float(r['f1_macro_mean']), float(r['f1_macro_std']))} & "
-            f"{br(prev)} \\\\"
-        )
-    out += [r"\bottomrule", r"\end{tabular}"]
-    _ = resumo
-    gravar("ton", out)
 
 
 def tabela_deteccao(nome: str, datasets: list[str]) -> None:
@@ -375,34 +299,62 @@ def tabela_deteccao(nome: str, datasets: list[str]) -> None:
     gravar(nome, out)
 
 
+def tabela_deteccao_artigo() -> None:
+    """FPR e categorias com detecção média abaixo de 99% nos datasets do artigo."""
+    linhas = ler_csv(RESULTS / "figuras" / "deteccao_por_ataque.csv")
+    out = [
+        r"\begin{tabular}{llrr}",
+        r"\toprule",
+        r"Dataset & Categoria & Fluxos & Taxa (\%) \\",
+        r"\midrule",
+    ]
+    for i, d in enumerate(ARTIGO):
+        sel = [
+            r
+            for r in linhas
+            if r["dataset"] == d
+            and (r["categoria"] == "Benign" or float(r["deteccao_media"]) < 0.99)
+        ]
+        if i:
+            out.append(r"\midrule")
+        for k, r in enumerate(sel):
+            n = len(sel) + (len(sel) == 1)
+            nome = f"\\multirow{{{n}}}{{*}}{{{CURTO[d]}}}" if k == 0 else ""
+            cat = "Benign (FPR)" if r["categoria"] == "Benign" else r["categoria"]
+            taxa = 100 * float(r["deteccao_media"])
+            desvio = 100 * float(r["deteccao_desvio"])
+            out.append(
+                f"{nome} & {_nome_categoria(cat)} & {milhar(int(r['fluxos_teste']))} & "
+                f"${br(taxa, 1)} \\pm {br(desvio, 1)}$ \\\\"
+            )
+        if len(sel) == 1:
+            out.append(r"& \emph{demais categorias} & & $\ge 99{,}0$ \\")
+    out += [r"\bottomrule", r"\end{tabular}"]
+    gravar("deteccao_artigo", out)
+
+
 def tabela_custo() -> None:
     nosso = {r["dataset"]: r for r in ler_csv(RESULTS / "tabela_custo.csv")}
     out = [
-        r"\begin{tabular}{l rr rr rr r}",
+        r"\begin{tabular}{l rr rr}",
         r"\toprule",
-        r"& \multicolumn{2}{c}{Parâmetros (M)} & \multicolumn{2}{c}{Treino (min)} & "
-        r"\multicolumn{2}{c}{Inferência ($\mu$s/fluxo)} & Mem. GPU \\",
-        r"\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}",
-        r"Dataset & nosso & artigo & nosso & artigo & nosso & artigo & (MB) \\",
+        r"& \multicolumn{2}{c}{Parâmetros (M)} & \multicolumn{2}{c}{Treino (min)} \\",
+        r"\cmidrule(lr){2-3}\cmidrule(lr){4-5}",
+        r"Dataset & nosso & artigo & nosso & artigo \\",
         r"\midrule",
     ]
     for d in [*ARTIGO, NOVO]:
         r = nosso[d]
         p = float(r["num_params_mean"]) / 1e6
         t = pm(float(r["train_time_min_mean"]), float(r["train_time_min_std"]), 1)
-        i = pm(float(r["inference_us_per_sample_mean"]),
-               float(r["inference_us_per_sample_std"]), 2)  # fmt: skip
         if d in TABELA2:
-            pa, th, ts, ia, isd = TABELA2[d]
-            art = (br(pa, 3), pm(60 * th, 60 * ts, 1), pm(ia, isd, 2))
+            pa, th, ts, _, _ = TABELA2[d]
+            art = (br(pa, 3), pm(60 * th, 60 * ts, 1))
         else:
-            art = ("--", "--", "--")
+            art = ("--", "--")
         if d == NOVO:
             out.append(r"\midrule")
-        out.append(
-            f"{CURTO[d]} & {br(p, 3)} & {art[0]} & {t} & {art[1]} & {i} & {art[2]} & "
-            f"{milhar(float(r['peak_gpu_mem_mb_mean']))} \\\\"
-        )
+        out.append(f"{CURTO[d]} & {br(p, 3)} & {art[0]} & {t} & {art[1]} \\\\")
     out += [r"\bottomrule", r"\end{tabular}"]
     gravar("custo", out)
 
@@ -414,12 +366,8 @@ def main() -> None:
         "contagens_cic", "NF-CSE-CIC-IDS2018-v2", "NF-CSE-CIC-IDS2018-v3"
     )
     tabela_contagens_ton()
-    tabela_hiperparametros()
     tabela_reproducao()
-    tabela_por_seed()
-    tabela_ton()
-    tabela_deteccao("deteccao_unsw", ["NF-UNSW-NB15-v2", "NF-UNSW-NB15-v3"])
-    tabela_deteccao("deteccao_cic", ["NF-CSE-CIC-IDS2018-v2", "NF-CSE-CIC-IDS2018-v3"])
+    tabela_deteccao_artigo()
     tabela_deteccao("deteccao_ton", [NOVO])
     tabela_custo()
     print(f"Tabelas gravadas em {SAIDA}")
