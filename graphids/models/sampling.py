@@ -21,16 +21,22 @@ from graphids.data.types import FlowGraph
 
 
 class NeighborhoodSampler:
-    """Calcula, para cada nó, a média das features das arestas de entrada.
+    """Calcula, para cada nó, as features agregadas das arestas de entrada.
+
+    Suporta agregação por média, máximo ou agregador rico (mean + max + log(grau)).
 
     Args:
         graph: grafo de um split (treino, validação ou teste).
         fanout: máximo de arestas de entrada usadas por nó. ``-1`` usa todas.
+        agg_type: tipo de agregação ('mean', 'max', 'mean_max', 'rich').
     """
 
-    def __init__(self, graph: FlowGraph, fanout: int = -1) -> None:
+    def __init__(
+        self, graph: FlowGraph, fanout: int = -1, agg_type: str = "mean"
+    ) -> None:
         self.graph = graph
         self.fanout = fanout
+        self.agg_type = agg_type
         device = graph.edge_attr.device
         dst = graph.edge_index[1]
         n = graph.num_nodes
@@ -49,6 +55,41 @@ class NeighborhoodSampler:
         total.index_add_(0, dst, graph.edge_attr)
         self.full_mean = total / in_degree.clamp(min=1).unsqueeze(1)
 
+        # Máximo sobre a vizinhança completa
+        if agg_type in {"max", "mean_max", "mean_max_logdeg", "rich"}:
+            out_max = torch.full((n, graph.num_features), float("-inf"), device=device)
+            if graph.edge_attr.shape[0] > 0:
+                dst_expanded = dst.unsqueeze(1).expand(-1, graph.num_features)
+                out_max.scatter_reduce_(
+                    0, dst_expanded, graph.edge_attr, reduce="amax", include_self=False
+                )
+            self.full_max = torch.where(
+                torch.isneginf(out_max), torch.zeros_like(out_max), out_max
+            )
+        else:
+            self.full_max = None
+
+        # Log do grau de entrada: log(1 + d_in)
+        if agg_type in {"mean_max_logdeg", "rich"}:
+            self.log_degree = torch.log1p(in_degree.float()).unsqueeze(1)
+        else:
+            self.log_degree = None
+
+        if agg_type == "mean":
+            self.full_feats = self.full_mean
+        elif agg_type == "max":
+            self.full_feats = self.full_max
+        elif agg_type == "mean_max":
+            self.full_feats = torch.cat([self.full_mean, self.full_max], dim=1)
+        elif agg_type in {"mean_max_logdeg", "rich"}:
+            self.full_feats = torch.cat(
+                [self.full_mean, self.full_max, self.log_degree], dim=1
+            )
+        else:
+            raise ValueError(f"agg_type desconhecido: {agg_type!r}")
+
+        self.node_dim = self.full_feats.shape[1]
+
         if fanout > 0:
             self.heavy = torch.nonzero(in_degree > fanout).flatten()
         else:
@@ -65,23 +106,37 @@ class NeighborhoodSampler:
     def node_features(
         self, nodes: torch.Tensor, generator: torch.Generator | None = None
     ) -> torch.Tensor:
-        """Média das arestas de entrada de cada nó de ``nodes``: [len(nodes), F].
+        """Features das arestas de entrada de cada nó: [len(nodes), node_dim].
 
-        Nós com grau de entrada até o ``fanout`` usam a média pré-calculada;
+        Nós com grau de entrada até o ``fanout`` usam as features pré-calculadas;
         os demais são reamostrados a cada chamada.
         """
-        feats = self.full_mean[nodes]
+        feats = self.full_feats[nodes].clone()
         heavy_pos = torch.nonzero(self._is_heavy[nodes]).flatten()
+        if len(heavy_pos) == 0:
+            return feats
+
         for pos in heavy_pos.tolist():
-            edges = self.sample_incoming(int(nodes[pos]), generator)
-            feats[pos] = self.graph.edge_attr[edges].mean(0)
+            node = int(nodes[pos])
+            edges = self.sample_incoming(node, generator)
+            selected = self.graph.edge_attr[edges]
+            if self.agg_type == "mean":
+                feats[pos] = selected.mean(0)
+            elif self.agg_type == "max":
+                feats[pos] = selected.amax(0)
+            elif self.agg_type == "mean_max":
+                feats[pos] = torch.cat([selected.mean(0), selected.amax(0)])
+            elif self.agg_type in {"mean_max_logdeg", "rich"}:
+                feats[pos] = torch.cat(
+                    [selected.mean(0), selected.amax(0), self.log_degree[node]]
+                )
         return feats
 
     def batch(self, edge_ids: torch.Tensor, generator: torch.Generator | None = None):
         """Prepara um mini-batch de fluxos para o E-GraphSAGE.
 
         Returns:
-            node_feats: [N_b, F], média de entrada dos hosts envolvidos no batch.
+            node_feats: [N_b, node_dim], features dos hosts envolvidos no batch.
             src_pos, dst_pos: [B], posição da origem e do destino de cada fluxo
                 dentro de ``node_feats``.
         """

@@ -118,6 +118,9 @@ def load_config(path: str | Path | None = None, overrides: list[str] | None = No
 
     if cfg.nhops != 1:
         raise NotImplementedError("Por enquanto só nhops=1 (configuração do artigo).")
-    if cfg.agg_type != "mean":
-        raise NotImplementedError("Por enquanto só agg_type='mean' (Tabela 14).")
+    VALID_AGGS = {"mean", "max", "mean_max", "mean_max_logdeg", "rich"}
+    if cfg.agg_type not in VALID_AGGS:
+        raise NotImplementedError(
+            f"agg_type {cfg.agg_type!r} não suportado. Válidos: {sorted(VALID_AGGS)}."
+        )
     return cfg

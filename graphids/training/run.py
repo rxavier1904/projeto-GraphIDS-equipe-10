@@ -108,7 +108,7 @@ def run_experiment(
     # threshold (no modo só-teste, ele é recalculado a partir desses scores).
     val = evaluate(
         model,
-        NeighborhoodSampler(splits.val.to(device), cfg.fanout),
+        NeighborhoodSampler(splits.val.to(device), cfg.fanout, agg_type=cfg.agg_type),
         cfg,
         seed=cfg.seed,
     )
@@ -117,7 +117,10 @@ def run_experiment(
 
     test_graph = splits.test.to(device)
     test = evaluate(
-        model, NeighborhoodSampler(test_graph, cfg.fanout), cfg, seed=cfg.seed
+        model,
+        NeighborhoodSampler(test_graph, cfg.fanout, agg_type=cfg.agg_type),
+        cfg,
+        seed=cfg.seed,
     )
     preds = (test.scores > threshold).astype(int)
     metrics = {
