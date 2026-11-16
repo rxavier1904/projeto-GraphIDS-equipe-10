@@ -60,6 +60,7 @@ class Config:
     # --- Execução ---
     device: str = "auto"  # "auto", "cpu" ou "cuda"
     output_dir: str = "results/runs"
+    run_name: str | None = None  # subpasta de saída (padrão: nome do dataset)
     extra: dict[str, Any] = field(default_factory=dict)
 
     def data_config(self) -> DataConfig:

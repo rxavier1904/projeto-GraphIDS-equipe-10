@@ -31,7 +31,7 @@ EXTRA=("$@")
 
 PYTHON="${PYTHON:-python}"
 OUTPUT_DIR="${OUTPUT_DIR:-results/runs}"
-DATASET="$("$PYTHON" -c "import yaml,sys; print(yaml.safe_load(open(sys.argv[1]))['dataset'])" "$CONFIG")"
+DATASET="$("$PYTHON" -c "import yaml,sys; cfg=yaml.safe_load(open(sys.argv[1])) or {}; print(cfg.get('run_name') or cfg.get('dataset', ''))" "$CONFIG")"
 LOG_DIR="${LOG_DIR:-results/logs}"
 mkdir -p "$LOG_DIR"
 

@@ -2,6 +2,7 @@
 # Hipótese da F4: preservar picos extremos e volume de tráfego para melhorar
 # a detecção de ataques de varredura (Scanning) e volumétricos (DoS/DDoS).
 dataset: NF-ToN-IoT-v3
+run_name: NF-ToN-IoT-v3-rich
 fraction: 0.2
 drop_timestamps: true
 edim_out: 96

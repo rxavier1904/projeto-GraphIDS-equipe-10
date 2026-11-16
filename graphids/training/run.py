@@ -35,7 +35,8 @@ from graphids.training.trainer import (
 
 
 def run_dir(cfg: Config) -> Path:
-    return Path(cfg.output_dir) / cfg.dataset / f"seed{cfg.seed}"
+    folder = cfg.run_name if cfg.run_name else cfg.dataset
+    return Path(cfg.output_dir) / folder / f"seed{cfg.seed}"
 
 
 def git_commit() -> str:
@@ -123,8 +124,11 @@ def run_experiment(
         seed=cfg.seed,
     )
     preds = (test.scores > threshold).astype(int)
+    exp_name = cfg.run_name if cfg.run_name else cfg.dataset
     metrics = {
-        "dataset": cfg.dataset,
+        "dataset": exp_name,
+        "base_dataset": cfg.dataset,
+        "agg_type": cfg.agg_type,
         "seed": cfg.seed,
         "test_pr_auc": test.pr_auc,
         "test_f1_macro": float(
