@@ -333,6 +333,40 @@ def tabela_deteccao_artigo() -> None:
     gravar("deteccao_artigo", out)
 
 
+AGREGADORES = [
+    ("NF-ToN-IoT-v3", "média (artigo)"),
+    ("NF-ToN-IoT-v3-max", "máximo"),
+    ("NF-ToN-IoT-v3-mean_max", "média + máx."),
+    ("NF-ToN-IoT-v3-rich", "rico"),
+]
+
+
+def _media_desvio(valores: list[float]) -> tuple[float, float]:
+    """Média e desvio-padrão amostral (ddof=1), como em aggregate_results.py."""
+    n = len(valores)
+    m = sum(valores) / n
+    s = (sum((v - m) ** 2 for v in valores) / (n - 1)) ** 0.5 if n > 1 else 0.0
+    return m, s
+
+
+def tabela_agregadores() -> None:
+    """Proposta da equipe: agregadores do E-GraphSAGE no NF-ToN-IoT-v3."""
+    out = [
+        r"\begin{tabular}{lccc}",
+        r"\toprule",
+        r"Agregador & PR-AUC & F1 macro & \makecell{Melhor\\época} \\",
+        r"\midrule",
+    ]
+    for pasta, nome in AGREGADORES:
+        ms = _metricas(pasta)
+        pr = _media_desvio([m["test_pr_auc"] for m in ms])
+        f1 = _media_desvio([m["test_f1_macro"] for m in ms])
+        ep = "--".join(str(e) for e in sorted(m["best_epoch"] for m in ms))
+        out.append(f"{nome} & {pm(*pr)} & {pm(*f1)} & {ep} \\\\")
+    out += [r"\bottomrule", r"\end{tabular}"]
+    gravar("agregadores", out)
+
+
 def tabela_custo() -> None:
     nosso = {r["dataset"]: r for r in ler_csv(RESULTS / "tabela_custo.csv")}
     out = [
@@ -370,6 +404,7 @@ def main() -> None:
     tabela_deteccao_artigo()
     tabela_deteccao("deteccao_ton", [NOVO])
     tabela_custo()
+    tabela_agregadores()
     print(f"Tabelas gravadas em {SAIDA}")
 
 

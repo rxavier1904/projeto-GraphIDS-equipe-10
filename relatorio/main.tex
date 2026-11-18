@@ -58,7 +58,10 @@ GraphIDS do zero em PyTorch e o avaliamos nos quatro datasets do artigo
 7 das 8 métricas ficam a até dois desvios-padrão do artigo (PR-AUC de 0,9983 no
 NF-UNSW-NB15-v3). No NF-ToN-IoT-v3, o desempenho cai para PR-AUC de 0,6872 e F1
 macro de 0,6408, porque varreduras e boa parte dos ataques web e de negação de
-serviço são reconstruídos tão bem quanto o tráfego normal.
+serviço são reconstruídos tão bem quanto o tráfego normal. Como proposta de
+melhoria, trocamos a agregação por média do E-GraphSAGE por agregadores que
+preservam picos e volume de tráfego; no NF-ToN-IoT-v3 eles melhoram a detecção
+de algumas categorias, mas nenhum supera a média na PR-AUC.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -96,7 +99,10 @@ As contribuições são:
   \item a reprodução nos quatro datasets do artigo com três seeds, com 7 das 8
         métricas a até dois desvios-padrão dos valores publicados;
   \item a primeira avaliação do GraphIDS no NF-ToN-IoT-v3, com análise por
-        categoria de ataque que expõe limitações do método.
+        categoria de ataque que expõe limitações do método;
+  \item uma proposta de agregadores alternativos para o E-GraphSAGE (máximo,
+        média + máximo e média + máximo + log do grau), avaliada no
+        NF-ToN-IoT-v3.
 \end{itemize}
 
 % ----------------------------------------------------------------------------
@@ -284,10 +290,29 @@ $\tau^\ast\leftarrow\arg\max_\tau \mathrm{F1}_{macro}$ na validação\;
 
 % ----------------------------------------------------------------------------
 \section{Solução proposta pela equipe}
+\label{sec:proposta}
 
-A proposta de melhoria é opcional e não foi realizada: o esforço foi dedicado à
-reimplementação, à reprodução e à avaliação no novo dataset. A
-Seção~\ref{sec:conclusao} indica as modificações que os resultados sugerem.
+\textbf{O que se espera melhorar.} No NF-ToN-IoT-v3, varreduras e ataques
+volumétricos são mal detectados (Seção~\ref{sec:res_ton}). A média da
+Eq.~(\ref{eq:agg}) dilui os poucos fluxos de ataque entre os milhares de fluxos
+benignos de um mesmo host e não informa quantas conexões ele recebe, justamente
+a assinatura de varredura e de DoS/DDoS no modelo de ameaça. A proposta troca o
+agregador do E-GraphSAGE por funções que preservam valores extremos e volume.
+
+\textbf{Componentes.} Só o agregador muda. A entrada continua sendo o conjunto
+de arestas que chegam em $w$, e a saída é o vetor do host que alimenta
+$\vect{W}_n$, cuja dimensão de entrada se ajusta. Avaliamos três variantes:
+\begin{align}
+\vect{a}^{\max}_w &= \max_{(z,w)\in\mathcal{N}_K(w)} \vect{x}_{zw} \quad\text{(elemento a elemento)},\\
+\vect{a}^{\mathrm{m+M}}_w &= \left[\vect{a}_w \,\Vert\, \vect{a}^{\max}_w\right],\\
+\vect{a}^{\mathrm{rico}}_w &= \left[\vect{a}_w \,\Vert\, \vect{a}^{\max}_w \,\Vert\, \log\left(1+d^{-}(w)\right)\right].
+\end{align}
+O máximo preserva fluxos extremos (por exemplo, um volume de bytes anômalo) e o
+log do grau de entrada informa o volume de conexões, comprimido em escala
+logarítmica por causa da cauda longa de graus do dataset
+(Figura~\ref{fig:cauda}). O restante do GraphIDS fica igual. Como a média, o
+máximo e o grau são pré-calculados por host, o custo extra é pequeno: o modelo
+passa de 99.778 para no máximo 102.228 parâmetros.
 
 % ----------------------------------------------------------------------------
 \section{Metodologia}
@@ -357,6 +382,16 @@ cobertos pelo artigo (ransomware, injection, XSS, MITM, password), com 38,98\%
 de ataques. Essa prevalência é a PR-AUC de um classificador aleatório, contra
 0,04 a 0,13 nos datasets do artigo. Pela escala (27,5 milhões de fluxos), usamos
 a mesma amostra de 20\% e o mesmo protocolo (Tabela~\ref{tab:contagens_ton}).
+A análise exploratória mostra que poucos hosts concentram o tráfego: cerca de 40
+origens têm de milhares a milhões de fluxos cada, e as demais têm poucas centenas
+ou menos (Figura~\ref{fig:cauda}).
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=\columnwidth]{ton_iot_cauda_longa_ip.png}
+\caption{NF-ToN-IoT-v3 completo: número de fluxos por host de origem (esquerda) e de destino (direita), ordenados, em escala log.}
+\label{fig:cauda}
+\end{figure}
 
 \begin{table}[!t]
 \centering
@@ -392,7 +427,8 @@ ajuste. O critério de reprodução é ficar a até dois desvios-padrão do valo
 publicado. Os baselines vêm da Tabela~3 do artigo, sem reexecução. Os
 experimentos rodaram em GPUs NVIDIA A100 do cluster SLURM do CIn-UFPE, com
 PyTorch 2.14.1. Em vez de usar DGL, nossa amostragem de vizinhança pré-calcula a
-média da Eq.~(\ref{eq:agg}).
+média da Eq.~(\ref{eq:agg}). A proposta da equipe foi avaliada no NF-ToN-IoT-v3
+com as mesmas seeds e hiperparâmetros, mudando só o agregador.
 
 % ----------------------------------------------------------------------------
 
@@ -457,6 +493,7 @@ memória de GPU semelhante e inferência de 0,24 a 0,82~$\mu$s por fluxo (2,27 a
 parâmetros, mas ela não afetou o desempenho.
 
 \subsection{Solução do artigo no NF-ToN-IoT-v3}
+\label{sec:res_ton}
 
 O GraphIDS obtém PR-AUC de $0{,}6872\pm0{,}0192$ e F1 macro de
 $0{,}6408\pm0{,}1488$. A PR-AUC é 1,8 vez a de um classificador aleatório (0,3898, a prevalência no teste),
@@ -498,7 +535,40 @@ prevalência de ataques também enfraquece a premissa de que anomalias são rara
 
 \subsection{Proposta da equipe}
 
-Não há resultados de uma versão modificada, pois a melhoria não foi realizada.
+\textbf{Nos dados do artigo.} A proposta não foi avaliada nos quatro datasets do
+artigo, então não há resultados nesse cenário.
+
+\begin{table}[!t]
+\centering
+\caption{Proposta da equipe no NF-ToN-IoT-v3: agregadores do E-GraphSAGE; rico = média + máximo + log do grau (média $\pm$ desvio entre as seeds 1, 2 e 3; melhor época de cada seed).}
+\label{tab:agregadores}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\input{tabelas/agregadores.tex}
+\end{table}
+
+\begin{figure*}[!t]
+\centering
+\includegraphics[width=0.8\textwidth]{comparativo_ataques.png}
+\caption{Taxa de detecção por categoria no teste do NF-ToN-IoT-v3 para cada agregador (média e desvio entre três seeds).}
+\label{fig:agregadores}
+\end{figure*}
+
+\textbf{No NF-ToN-IoT-v3} (Tabela~\ref{tab:agregadores} e
+Figura~\ref{fig:agregadores}). Nenhum agregador supera a média na PR-AUC: o rico
+chega a 0,5755, contra 0,6872, e o máximo e a média + máximo ficam abaixo de
+0,55. No F1 macro, o rico empata com a média (0,6411 contra 0,6408), com desvio
+três vezes menor. Por categoria, a proposta cumpre parte do esperado: o máximo
+eleva XSS de 40\% para 90\% e injection de 68\% para 82\%, e o rico eleva
+password de 43\% para 53\% e scanning de 4\% para 15\%. O ganho custa caro em
+outras categorias: com máximo e média + máximo, backdoor e ransomware caem de
+100\% para 6\% a 61\%, e o rico perde DDoS (de 50\% para 33\%). Uma explicação
+provável é que, nos poucos hosts com milhões de arestas, o máximo satura e fica
+igual para hosts benignos e maliciosos; o log do grau devolve ao rico a
+informação de volume e recupera backdoor e ransomware (95\% e 100\%). O rico
+também atinge o melhor checkpoint mais tarde (épocas 18 a 49, contra 1 a 6), o
+que indica que ele atenua, sem eliminar, o desalinhamento entre reconstrução e
+detecção.
 
 % ----------------------------------------------------------------------------
 \section{Conclusão e trabalhos futuros}
@@ -506,7 +576,12 @@ Não há resultados de uma versão modificada, pois a melhoria não foi realizad
 
 Reimplementamos o GraphIDS e reproduzimos seus resultados nos quatro datasets do
 artigo, com 7 das 8 métricas a até dois desvios-padrão e com um modelo menor e
-mais rápido. No NF-ToN-IoT-v3, o desempenho cai bastante (PR-AUC de 0,6872).
+mais rápido. No NF-ToN-IoT-v3, o desempenho cai bastante (PR-AUC de 0,6872). A
+proposta de agregadores ricos melhora a detecção de XSS, injection, password e
+scanning, mas piora outras categorias e não supera a média na PR-AUC.
+
+As limitações da proposta são: foi avaliada só no NF-ToN-IoT-v3 e com os
+hiperparâmetros da média, e o máximo é sensível a fluxos extremos isolados.
 
 As principais limitações do método são: o limiar e o \emph{early stopping}
 dependem de validação rotulada; a reconstrução não garante separação quando os
@@ -516,8 +591,8 @@ tráfego normal (Infiltration, ToN-IoT); e não há avaliação contra mudanças
 distribuição, evasão ou envenenamento (P4 e P5). Do nosso lado, usamos três
 seeds, não reexecutamos os baselines e não ajustamos o NF-ToN-IoT-v3.
 
-Como trabalhos futuros, propomos: ajustar os hiperparâmetros do NF-ToN-IoT-v3
-pela PR-AUC de validação; concatenar $\vect{x}_{uv}$ a
+Como trabalhos futuros, propomos: avaliar os agregadores nos datasets do artigo;
+ajustar os hiperparâmetros do NF-ToN-IoT-v3 pela PR-AUC de validação; concatenar $\vect{x}_{uv}$ a
 $[\vect{h}_u\Vert\vect{h}_v]$ na Eq.~(\ref{eq:edge}); usar limiar e critério de
 parada não supervisionados; e avaliar a robustez a ataques adaptativos.
 
