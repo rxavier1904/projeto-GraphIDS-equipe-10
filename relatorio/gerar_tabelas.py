@@ -352,9 +352,10 @@ def _media_desvio(valores: list[float]) -> tuple[float, float]:
 def tabela_agregadores() -> None:
     """Proposta da equipe: agregadores do E-GraphSAGE no NF-ToN-IoT-v3."""
     out = [
-        r"\begin{tabular}{lccc}",
+        r"\begin{tabular}{lcccc}",
         r"\toprule",
-        r"Agregador & PR-AUC & F1 macro & \makecell{Melhor\\época} \\",
+        r"Agregador & PR-AUC & F1 macro & \makecell{Melhor\\época} & "
+        r"\makecell{Treino\\(min)} \\",
         r"\midrule",
     ]
     for pasta, nome in AGREGADORES:
@@ -362,7 +363,8 @@ def tabela_agregadores() -> None:
         pr = _media_desvio([m["test_pr_auc"] for m in ms])
         f1 = _media_desvio([m["test_f1_macro"] for m in ms])
         ep = "--".join(str(e) for e in sorted(m["best_epoch"] for m in ms))
-        out.append(f"{nome} & {pm(*pr)} & {pm(*f1)} & {ep} \\\\")
+        tr = _media_desvio([m["train_time_s"] / 60 for m in ms])
+        out.append(f"{nome} & {pm(*pr)} & {pm(*f1)} & {ep} & {pm(*tr, 1)} \\\\")
     out += [r"\bottomrule", r"\end{tabular}"]
     gravar("agregadores", out)
 

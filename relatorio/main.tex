@@ -540,11 +540,11 @@ artigo, então não há resultados nesse cenário.
 
 \begin{table}[!t]
 \centering
-\caption{Proposta da equipe no NF-ToN-IoT-v3: agregadores do E-GraphSAGE; rico = média + máximo + log do grau (média $\pm$ desvio entre as seeds 1, 2 e 3; melhor época de cada seed).}
+\caption{Proposta da equipe no NF-ToN-IoT-v3: agregadores do E-GraphSAGE; rico = média + máximo + log do grau (média $\pm$ desvio entre as seeds 1, 2 e 3; melhor época de cada seed; tempo de treino em minutos).}
 \label{tab:agregadores}
 \footnotesize
 \setlength{\tabcolsep}{3pt}
-\input{tabelas/agregadores.tex}
+\resizebox{\columnwidth}{!}{\input{tabelas/agregadores.tex}}
 \end{table}
 
 \begin{figure*}[!t]
@@ -568,7 +568,9 @@ igual para hosts benignos e maliciosos; o log do grau devolve ao rico a
 informação de volume e recupera backdoor e ransomware (95\% e 100\%). O rico
 também atinge o melhor checkpoint mais tarde (épocas 18 a 49, contra 1 a 6), o
 que indica que ele atenua, sem eliminar, o desalinhamento entre reconstrução e
-detecção.
+detecção. O custo praticamente não muda: o treino leva de 3,5 a 6,6 minutos
+em média (5,4 com a média), a inferência fica entre 0,56 e 0,63~$\mu$s por
+fluxo (0,82 com a média) e o pico de memória da GPU, perto de 1,18~GB em todos.
 
 % ----------------------------------------------------------------------------
 \section{Conclusão e trabalhos futuros}
