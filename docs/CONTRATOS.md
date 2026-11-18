@@ -72,6 +72,11 @@ results/runs/<dataset>/seed<s>/
 }
 ```
 
+Execuções de ablação (F4) também gravam `"run_name"` (subpasta usada em
+`results/runs/`, ex.: `NF-ToN-IoT-v3-rich`) e `"agg_type"`. O campo `dataset` continua
+sendo o nome do dataset. `scripts/aggregate_results.py` ignora as execuções com
+`agg_type` diferente de `mean`.
+
 ## C3: Config (F1 define o esquema, F3 e F4 criam arquivos)
 
 YAML plano com as chaves de hiperparâmetros da Tabela 14 do artigo: `edim_out`,

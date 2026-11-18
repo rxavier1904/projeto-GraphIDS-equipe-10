@@ -49,3 +49,14 @@ def test_gradiente_chega_ao_gnn(splits):
     out.loss.backward()
     assert model.encoder.fc_neigh.weight.grad.abs().sum() > 0
     assert model.autoencoder.input_projection.weight.grad.abs().sum() > 0
+
+
+def test_agregador_rico_end_to_end(splits):
+    sampler = NeighborhoodSampler(splits.train, fanout=64, agg_type="rich")
+    model = GraphIDS(splits.num_features, 16, 8, window_size=32, agg_type="rich")
+    assert model.encoder.fc_neigh.in_features == 2 * splits.num_features + 1
+    out = model(*sampler.batch(torch.arange(200)), ae_batch_size=2)
+    out.loss.backward()
+    assert model.encoder.fc_neigh.weight.grad is not None
+    assert model.encoder.fc_neigh.weight.grad.abs().sum() > 0
+    assert model.encoder.fc_edge.weight.grad.abs().sum() > 0
