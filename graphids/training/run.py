@@ -124,10 +124,9 @@ def run_experiment(
         seed=cfg.seed,
     )
     preds = (test.scores > threshold).astype(int)
-    exp_name = cfg.run_name if cfg.run_name else cfg.dataset
     metrics = {
-        "dataset": exp_name,
-        "base_dataset": cfg.dataset,
+        "dataset": cfg.dataset,
+        "run_name": run_dir(cfg).parent.name,
         "agg_type": cfg.agg_type,
         "seed": cfg.seed,
         "test_pr_auc": test.pr_auc,

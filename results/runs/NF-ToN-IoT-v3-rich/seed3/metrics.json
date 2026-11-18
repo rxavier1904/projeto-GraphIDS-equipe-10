@@ -1,6 +1,6 @@
 {
-  "dataset": "NF-ToN-IoT-v3-rich",
-  "base_dataset": "NF-ToN-IoT-v3",
+  "dataset": "NF-ToN-IoT-v3",
+  "run_name": "NF-ToN-IoT-v3-rich",
   "agg_type": "rich",
   "seed": 3,
   "test_pr_auc": 0.6386558445007313,

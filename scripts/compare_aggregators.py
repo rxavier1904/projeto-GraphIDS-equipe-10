@@ -19,7 +19,7 @@ Gera:
 Uso:
     python scripts/compare_aggregators.py                     # agrega todas as seeds
     python scripts/compare_aggregators.py --seed 1            # só seed 1
-    python scripts/compare_aggregators.py --runs results/runs --out results
+    python scripts/compare_aggregators.py --runs results/runs --out results/figuras
 """
 
 from __future__ import annotations
@@ -51,7 +51,7 @@ MODELS = [
 ]
 
 
-def load_single_seed(seed_dir: Path, folder: str, runs_dir: Path):
+def load_single_seed(seed_dir: Path):
     metrics_file = seed_dir / "metrics.json"
     history_file = seed_dir / "history.json"
     scores_file = seed_dir / "scores_test.npz"
@@ -80,35 +80,6 @@ def load_single_seed(seed_dir: Path, folder: str, runs_dir: Path):
             )
         except Exception as e:
             print(f"[Aviso] Erro ao ler {scores_file}: {e}")
-    elif folder == "NF-ToN-IoT-v3":
-        for cand in [
-            runs_dir.parent / "figuras" / "deteccao_por_ataque.csv",
-            Path("results/figuras/deteccao_por_ataque.csv"),
-        ]:
-            if cand.exists():
-                try:
-                    df_det = pd.read_csv(cand)
-                    sub = df_det[df_det["dataset"] == "NF-ToN-IoT-v3"]
-                    detection_rates = dict(
-                        zip(sub["categoria"], sub["deteccao_media"], strict=False)
-                    )
-                    break
-                except Exception:
-                    pass
-        if not detection_rates:
-            detection_rates = {
-                "Backdoor": 1.0,
-                "ddos": 0.49819,
-                "dos": 0.36373,
-                "injection": 0.67701,
-                "mitm": 0.34444,
-                "password": 0.43420,
-                "ransomware": 1.0,
-                "scanning": 0.04246,
-                "xss": 0.40475,
-                "Benign": 0.09904,
-            }
-
     return {
         "metrics": metrics,
         "history": history,
@@ -121,6 +92,19 @@ def _calc_stats(vals):
     mean = float(np.mean(arr)) if len(arr) > 0 else 0.0
     std = float(np.std(arr, ddof=1)) if len(arr) > 1 else 0.0
     return mean, std
+
+
+def _rates_from_csv(runs_dir: Path, dataset: str) -> dict:
+    """(média, desvio) da detecção por categoria em ``deteccao_por_ataque.csv``."""
+    csv = runs_dir.parent / "figuras" / "deteccao_por_ataque.csv"
+    if not csv.exists():
+        return {}
+    df = pd.read_csv(csv)
+    sub = df[df["dataset"] == dataset]
+    return {
+        row.categoria: (float(row.deteccao_media), float(row.deteccao_desvio))
+        for row in sub.itertuples()
+    }
 
 
 def load_experiment_data(runs_dir: Path, target_seed: int | None = None):
@@ -137,7 +121,7 @@ def load_experiment_data(runs_dir: Path, target_seed: int | None = None):
 
         runs = []
         for sdir in seed_dirs:
-            data = load_single_seed(sdir, folder, runs_dir)
+            data = load_single_seed(sdir)
             if data is not None:
                 runs.append(data)
 
@@ -163,6 +147,10 @@ def load_experiment_data(runs_dir: Path, target_seed: int | None = None):
             all_cats.update(r["detection_rates"].keys())
 
         agg_detection_rates = {}
+        if not all_cats and target_seed is None:
+            # Sem scores_test.npz locais (ficam fora do git): usa a média e o
+            # desvio por seed já calculados em deteccao_por_ataque.csv.
+            agg_detection_rates = _rates_from_csv(runs_dir, folder)
         for cat in all_cats:
             cat_vals = [
                 r["detection_rates"][cat] for r in runs if cat in r["detection_rates"]
@@ -523,7 +511,9 @@ def main():
         default=None,
         help="seed específica (padrão: agrega todas as seeds disponíveis)",
     )
-    p.add_argument("--out", default="results", help="diretório de saída dos gráficos")
+    p.add_argument(
+        "--out", default="results/figuras", help="diretório de saída dos gráficos"
+    )
     args = p.parse_args()
 
     runs_dir = Path(args.runs)

@@ -1,6 +1,6 @@
 {
-  "dataset": "NF-ToN-IoT-v3-max",
-  "base_dataset": "NF-ToN-IoT-v3",
+  "dataset": "NF-ToN-IoT-v3",
+  "run_name": "NF-ToN-IoT-v3-max",
   "agg_type": "max",
   "seed": 2,
   "test_pr_auc": 0.5852403530607508,
