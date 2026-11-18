@@ -14,12 +14,12 @@ dependencies = [
     "pandas>=2.1",
     "scikit-learn>=1.4",
     "pyyaml>=6.0",
-    "matplotlib>=3.8",
-    "seaborn>=0.13"
+    "matplotlib>=3.10",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "ruff==0.17.0"]
+eda = ["seaborn>=0.13", "jupyter"]
 
 [tool.setuptools.packages.find]
 include = ["graphids*"]

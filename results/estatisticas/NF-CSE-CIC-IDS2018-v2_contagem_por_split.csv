@@ -1,0 +1,19 @@
+Categoria,Treino,Validação,Teste,Total
+Benign,2661690,332711,332712,3327113
+Bot,0,2862,2862,5724
+Brute Force -Web,0,43,43,86
+Brute Force -XSS,0,19,18,37
+DDOS attack-HOIC,0,21617,21618,43235
+DDOS attack-LOIC-UDP,0,42,42,84
+DDoS attacks-LOIC-HTTP,0,6146,6146,12292
+DoS attacks-GoldenEye,0,554,555,1109
+DoS attacks-Hulk,0,8653,8653,17306
+DoS attacks-SlowHTTPTest,0,283,282,565
+DoS attacks-Slowloris,0,190,190,380
+FTP-BruteForce,0,519,518,1037
+Infilteration,0,2327,2328,4655
+SQL Injection,0,9,8,17
+SSH-Bruteforce,0,1899,1900,3799
+Ataques (total),0,45163,45163,90326
+Total,2661690,377874,377875,3417439
+Hosts com arestas,101953,29939,29893,114795

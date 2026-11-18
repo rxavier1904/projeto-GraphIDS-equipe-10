@@ -1,0 +1,16 @@
+\begin{table}[ht]
+\centering
+\caption{Reprodução do GraphIDS: média $\pm$ desvio no teste entre seeds, comparada com a Tabela 3 do artigo.}
+\label{tab:reproducao}
+\begin{tabular}{lrrrrrrr}
+\toprule
+Dataset & Seeds & PR-AUC (nosso) & PR-AUC (artigo) & $\Delta$ & F1 macro (nosso) & F1 macro (artigo) & $\Delta$ \\
+\midrule
+NF-UNSW-NB15-v3 & 3 & $0,9983 \pm 0,0029$ & $0,9998 \pm 0,0007$ & -0,0015 & $0,9999 \pm 0,0001$ & $0,9961 \pm 0,0084$ & 0,0038 \\
+NF-CSE-CIC-IDS2018-v3 & 3 & $0,8714 \pm 0,0531$ & $0,8819 \pm 0,0347$ & -0,0105 & $0,9252 \pm 0,0435$ & $0,9447 \pm 0,0213$ & -0,0195 \\
+NF-UNSW-NB15-v2 & 3 & $0,7678 \pm 0,1236$ & $0,8116 \pm 0,0367$ & -0,0438 & $0,9232 \pm 0,0038$ & $0,9264 \pm 0,0217$ & -0,0032 \\
+NF-CSE-CIC-IDS2018-v2 & 3 & $0,9344 \pm 0,0207$ & $0,9201 \pm 0,0238$ & 0,0143 & $0,9567 \pm 0,0179$ & $0,9431 \pm 0,0131$ & 0,0136 \\
+NF-ToN-IoT-v3 & 3 & $0,6872 \pm 0,0192$ & — & — & $0,6408 \pm 0,1488$ & — & — \\
+\bottomrule
+\end{tabular}
+\end{table}

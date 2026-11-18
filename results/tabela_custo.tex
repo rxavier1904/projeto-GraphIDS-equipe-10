@@ -1,0 +1,16 @@
+\begin{table}[ht]
+\centering
+\caption{Custo computacional do GraphIDS por dataset (média $\pm$ desvio entre seeds).}
+\label{tab:custo}
+\begin{tabular}{lrrrr}
+\toprule
+Dataset & Parâmetros & Treino (min) & Inferência ($\mu$s/amostra) & Pico GPU (MB) \\
+\midrule
+NF-UNSW-NB15-v3 & 99.778 & $8,7 \pm 3,5$ & $0,76 \pm 0,57$ & $901 \pm 2$ \\
+NF-CSE-CIC-IDS2018-v3 & 59.314 & $8,7 \pm 4,1$ & $0,44 \pm 0,00$ & $1201 \pm 0$ \\
+NF-UNSW-NB15-v2 & 93.194 & $2,5 \pm 0,9$ & $0,24 \pm 0,00$ & $1260 \pm 0$ \\
+NF-CSE-CIC-IDS2018-v2 & 57.562 & $7,8 \pm 6,5$ & $0,69 \pm 0,20$ & $1068 \pm 0$ \\
+NF-ToN-IoT-v3 & 99.778 & $5,4 \pm 2,7$ & $0,82 \pm 0,24$ & $1175 \pm 0$ \\
+\bottomrule
+\end{tabular}
+\end{table}
