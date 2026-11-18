@@ -58,6 +58,7 @@ def flow_embeddings(
     fanout: int,
     batch_size: int = 16384,
     seed: int = 0,
+    agg_type: str | None = None,
 ) -> np.ndarray:
     """Embeddings ``h_i`` [len(edge_ids), edim_out] dos fluxos pedidos.
 
@@ -66,7 +67,11 @@ def flow_embeddings(
     """
     model.eval()
     device = graph.edge_attr.device
-    sampler = NeighborhoodSampler(graph, fanout)
+    if agg_type is None:
+        agg_type = getattr(
+            model, "agg_type", getattr(model.encoder, "agg_type", "mean")
+        )
+    sampler = NeighborhoodSampler(graph, fanout, agg_type=agg_type)
     generator = torch.Generator().manual_seed(seed)
     ids = torch.as_tensor(edge_ids, dtype=torch.long)
     out = []

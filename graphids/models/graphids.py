@@ -73,11 +73,13 @@ class GraphIDS(nn.Module):
         window_size: int = 512,
         mask_ratio: float = 0.15,
         detach_target: bool = False,
+        agg_type: str = "mean",
     ) -> None:
         super().__init__()
         self.window_size = window_size
         self.detach_target = detach_target
-        self.encoder = EGraphSAGE(in_features, edim_out, gnn_dropout)
+        self.agg_type = agg_type
+        self.encoder = EGraphSAGE(in_features, edim_out, gnn_dropout, agg_type=agg_type)
         self.autoencoder = TransformerMAE(
             edim_out, embed_dim, num_heads, num_layers, ff_dim, ae_dropout, mask_ratio
         )
@@ -96,6 +98,7 @@ class GraphIDS(nn.Module):
             window_size=cfg.window_size,
             mask_ratio=cfg.mask_ratio,
             detach_target=cfg.detach_target,
+            agg_type=cfg.agg_type,
         )
 
     def embed(self, node_feats, src_pos, dst_pos) -> torch.Tensor:

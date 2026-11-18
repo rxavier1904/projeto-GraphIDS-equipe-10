@@ -35,7 +35,8 @@ from graphids.training.trainer import (
 
 
 def run_dir(cfg: Config) -> Path:
-    return Path(cfg.output_dir) / cfg.dataset / f"seed{cfg.seed}"
+    folder = cfg.run_name if cfg.run_name else cfg.dataset
+    return Path(cfg.output_dir) / folder / f"seed{cfg.seed}"
 
 
 def git_commit() -> str:
@@ -108,7 +109,7 @@ def run_experiment(
     # threshold (no modo só-teste, ele é recalculado a partir desses scores).
     val = evaluate(
         model,
-        NeighborhoodSampler(splits.val.to(device), cfg.fanout),
+        NeighborhoodSampler(splits.val.to(device), cfg.fanout, agg_type=cfg.agg_type),
         cfg,
         seed=cfg.seed,
     )
@@ -117,11 +118,16 @@ def run_experiment(
 
     test_graph = splits.test.to(device)
     test = evaluate(
-        model, NeighborhoodSampler(test_graph, cfg.fanout), cfg, seed=cfg.seed
+        model,
+        NeighborhoodSampler(test_graph, cfg.fanout, agg_type=cfg.agg_type),
+        cfg,
+        seed=cfg.seed,
     )
     preds = (test.scores > threshold).astype(int)
     metrics = {
         "dataset": cfg.dataset,
+        "run_name": run_dir(cfg).parent.name,
+        "agg_type": cfg.agg_type,
         "seed": cfg.seed,
         "test_pr_auc": test.pr_auc,
         "test_f1_macro": float(

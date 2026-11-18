@@ -191,8 +191,8 @@ def fit(
     """
     train_graph: FlowGraph = splits.train.to(device)
     val_graph: FlowGraph = splits.val.to(device)
-    train_sampler = NeighborhoodSampler(train_graph, cfg.fanout)
-    val_sampler = NeighborhoodSampler(val_graph, cfg.fanout)
+    train_sampler = NeighborhoodSampler(train_graph, cfg.fanout, agg_type=cfg.agg_type)
+    val_sampler = NeighborhoodSampler(val_graph, cfg.fanout, agg_type=cfg.agg_type)
     optimizer = build_optimizer(model, cfg)
     generator = torch.Generator().manual_seed(cfg.seed)
 

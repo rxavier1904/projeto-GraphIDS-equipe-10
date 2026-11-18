@@ -19,20 +19,41 @@ from torch import nn
 
 
 class EGraphSAGE(nn.Module):
-    """E-GraphSAGE de 1 camada com agregação por média.
+    """E-GraphSAGE de 1 camada com agregação configurável (mean, max, rich).
 
     Args:
         in_features: número de features de cada fluxo (F).
         out_features: dimensão do embedding do fluxo (``edim_out``).
         dropout: dropout aplicado no embedding final (até 0.75 na Tabela 14).
+        agg_type: tipo de agregação ('mean', 'max', 'mean_max', 'rich').
     """
 
-    def __init__(self, in_features: int, out_features: int, dropout: float = 0.0):
+    def __init__(
+        self,
+        in_features: int,
+        out_features: int,
+        dropout: float = 0.0,
+        agg_type: str = "mean",
+    ) -> None:
         super().__init__()
-        self.fc_neigh = nn.Linear(in_features, in_features)
+        self.in_features = in_features
+        self.out_features = out_features
+        self.agg_type = agg_type
+        self.node_dim = self._calc_node_dim(in_features, agg_type)
+        self.fc_neigh = nn.Linear(self.node_dim, in_features)
         self.fc_edge = nn.Linear(2 * in_features, out_features)
         self.dropout = nn.Dropout(dropout)
         self.reset_parameters()
+
+    @staticmethod
+    def _calc_node_dim(in_features: int, agg_type: str) -> int:
+        if agg_type in {"mean", "max"}:
+            return in_features
+        if agg_type == "mean_max":
+            return 2 * in_features
+        if agg_type in {"mean_max_logdeg", "rich"}:
+            return 2 * in_features + 1
+        raise ValueError(f"agg_type desconhecido: {agg_type!r}")
 
     def reset_parameters(self) -> None:
         gain = nn.init.calculate_gain("relu")
@@ -47,8 +68,8 @@ class EGraphSAGE(nn.Module):
         """Calcula os embeddings dos fluxos de um mini-batch.
 
         Args:
-            node_feats: [N_b, F], média das arestas de entrada de cada host
-                (vem de ``NeighborhoodSampler.batch``).
+            node_feats: [N_b, node_dim], features agregadas das arestas de entrada
+                de cada host (vem de ``NeighborhoodSampler.batch``).
             src_pos, dst_pos: [B], índices da origem e do destino em ``node_feats``.
 
         Returns:

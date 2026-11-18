@@ -19,6 +19,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "ruff==0.17.0"]
+eda = ["seaborn>=0.13", "jupyter"]
 
 [tool.setuptools.packages.find]
 include = ["graphids*"]

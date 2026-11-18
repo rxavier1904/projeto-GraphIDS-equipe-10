@@ -55,6 +55,17 @@ def runs_dir(tmp_path):
     return runs
 
 
+def test_load_runs_ignora_ablacoes_de_agregador(agg, runs_dir):
+    out = runs_dir / "NF-ToN-IoT-v3-rich" / "seed1"
+    out.mkdir(parents=True)
+    metrics = {"dataset": "NF-ToN-IoT-v3", "run_name": "NF-ToN-IoT-v3-rich"}
+    metrics.update(agg_type="rich", seed=1, test_pr_auc=0.5, test_f1_macro=0.5)
+    (out / "metrics.json").write_text(json.dumps(metrics))
+    runs = agg.load_runs(runs_dir)
+    assert len(runs) == 6
+    assert (runs["dataset"] == "NF-ToN-IoT-v3").sum() == 1
+
+
 def test_load_runs(agg, runs_dir):
     runs = agg.load_runs(runs_dir)
     assert len(runs) == 6
