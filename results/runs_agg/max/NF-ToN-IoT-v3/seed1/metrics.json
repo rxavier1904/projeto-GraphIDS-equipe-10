@@ -1,0 +1,15 @@
+{
+  "dataset": "NF-ToN-IoT-v3",
+  "seed": 1,
+  "test_pr_auc": 0.6308373443626928,
+  "test_f1_macro": 0.6612658394750173,
+  "val_best_pr_auc": 0.6192883988359009,
+  "threshold": 0.10307691117491058,
+  "best_epoch": 21,
+  "train_time_s": 310.95696015283465,
+  "inference_us_per_sample": 0.5546661352899708,
+  "peak_gpu_mem_mb": 1179.12841796875,
+  "num_params": 99778,
+  "agg_type": "max",
+  "git_commit": "c5920aa"
+}

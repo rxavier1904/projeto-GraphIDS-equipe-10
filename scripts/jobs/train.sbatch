@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Job SLURM do GraphIDS: um array job com uma tarefa por seed (entrega 3.3 da F3).
 #
-# Configurado para o cluster SLURM do CIn (ver docs/SERVIDOR.md): partição
+# Configurado para o cluster SLURM do CIn: partição
 # short-simple (máx. 2 dias; a debug recusa jobs por QoS) e 1 GPU. Sem
 # --exclude, o job pode cair numa fatia MIG de 10 GB do cluster-node6; para
 # exigir A100 inteira, submeta com: sbatch --exclude=cluster-node6 ...
@@ -31,6 +31,8 @@ VENV="${VENV:-.venv}"
 SEED="${SLURM_ARRAY_TASK_ID:-1}"
 
 cd "${SLURM_SUBMIT_DIR:-.}"
+# Em job só de CPU (--gres=gpu:0), limita o PyTorch aos núcleos alocados.
+export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-8}"
 # shellcheck disable=SC1091
 source "$VENV/bin/activate"
 

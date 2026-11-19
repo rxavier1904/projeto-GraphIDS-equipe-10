@@ -20,7 +20,7 @@ from sklearn.metrics import average_precision_score
 
 from graphids.data.types import FlowGraph, GraphSplits
 from graphids.models.graphids import GraphIDS
-from graphids.models.sampling import NeighborhoodSampler
+from graphids.models.sampling import NeighborhoodSampler, make_sampler
 from graphids.training.threshold import best_f1_threshold
 
 
@@ -191,8 +191,8 @@ def fit(
     """
     train_graph: FlowGraph = splits.train.to(device)
     val_graph: FlowGraph = splits.val.to(device)
-    train_sampler = NeighborhoodSampler(train_graph, cfg.fanout, agg_type=cfg.agg_type)
-    val_sampler = NeighborhoodSampler(val_graph, cfg.fanout, agg_type=cfg.agg_type)
+    train_sampler = make_sampler(train_graph, cfg, splits)
+    val_sampler = make_sampler(val_graph, cfg, splits)
     optimizer = build_optimizer(model, cfg)
     generator = torch.Generator().manual_seed(cfg.seed)
 

@@ -23,7 +23,7 @@ from sklearn.metrics import f1_score
 from graphids.config import Config
 from graphids.data import load_splits
 from graphids.models.graphids import GraphIDS
-from graphids.models.sampling import NeighborhoodSampler
+from graphids.models.sampling import make_sampler
 from graphids.training.threshold import best_f1_threshold
 from graphids.training.trainer import (
     EvalResult,
@@ -109,7 +109,7 @@ def run_experiment(
     # threshold (no modo só-teste, ele é recalculado a partir desses scores).
     val = evaluate(
         model,
-        NeighborhoodSampler(splits.val.to(device), cfg.fanout, agg_type=cfg.agg_type),
+        make_sampler(splits.val.to(device), cfg, splits),
         cfg,
         seed=cfg.seed,
     )
@@ -117,12 +117,7 @@ def run_experiment(
         threshold, _ = best_f1_threshold(val.scores, val.labels, cfg.threshold_steps)
 
     test_graph = splits.test.to(device)
-    test = evaluate(
-        model,
-        NeighborhoodSampler(test_graph, cfg.fanout, agg_type=cfg.agg_type),
-        cfg,
-        seed=cfg.seed,
-    )
+    test = evaluate(model, make_sampler(test_graph, cfg, splits), cfg, seed=cfg.seed)
     preds = (test.scores > threshold).astype(int)
     metrics = {
         "dataset": cfg.dataset,

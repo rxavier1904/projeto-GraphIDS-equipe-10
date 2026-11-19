@@ -9,13 +9,15 @@ Para um fluxo u -> v:
 Assim cada fluxo carrega o contexto local (1 hop) dos dois hosts que ele liga.
 A feature do próprio nó não entra (os nós não têm atributos nos datasets NetFlow),
 e o fluxo só influencia o próprio embedding pela agregação em v. As duas
-escolhas seguem o código oficial (ver docs/REFERENCIA-CODIGO-OFICIAL.md).
+escolhas seguem o código oficial (github.com/lorenzo9uerra/GraphIDS).
 """
 
 from __future__ import annotations
 
 import torch
 from torch import nn
+
+from graphids.models.sampling import agg_node_dim
 
 
 class EGraphSAGE(nn.Module):
@@ -25,7 +27,7 @@ class EGraphSAGE(nn.Module):
         in_features: número de features de cada fluxo (F).
         out_features: dimensão do embedding do fluxo (``edim_out``).
         dropout: dropout aplicado no embedding final (até 0.75 na Tabela 14).
-        agg_type: tipo de agregação ('mean', 'max', 'mean_max', 'rich').
+        agg_type: tipo de agregação (ver ``sampling.AGG_TYPES``).
     """
 
     def __init__(
@@ -47,13 +49,7 @@ class EGraphSAGE(nn.Module):
 
     @staticmethod
     def _calc_node_dim(in_features: int, agg_type: str) -> int:
-        if agg_type in {"mean", "max"}:
-            return in_features
-        if agg_type == "mean_max":
-            return 2 * in_features
-        if agg_type in {"mean_max_logdeg", "rich"}:
-            return 2 * in_features + 1
-        raise ValueError(f"agg_type desconhecido: {agg_type!r}")
+        return agg_node_dim(in_features, agg_type)
 
     def reset_parameters(self) -> None:
         gain = nn.init.calculate_gain("relu")
