@@ -33,8 +33,11 @@ class Config:
     edim_out: int = 64  # dimensão do embedding de cada fluxo (d_gnn)
     nhops: int = 1  # o artigo usa só 1 hop (Apêndice C.5)
     fanout: int = 32768  # máximo de arestas de entrada amostradas por nó (-1 = todas)
-    agg_type: str = "mean"
+    agg_type: str = "mean"  # mean (artigo); ablação: ver sampling.AGG_TYPES
     gnn_dropout: float = 0.5
+    # Poda da vizinhança (ablação): fluxos com bytes abaixo deste percentil do
+    # treino não entram na agregação dos hosts, mas continuam sendo avaliados.
+    prune_bytes_pct: float | None = None
 
     # --- Transformer masked autoencoder (Seção 3.3) ---
     num_layers: int = 1
@@ -119,9 +122,11 @@ def load_config(path: str | Path | None = None, overrides: list[str] | None = No
 
     if cfg.nhops != 1:
         raise NotImplementedError("Por enquanto só nhops=1 (configuração do artigo).")
-    VALID_AGGS = {"mean", "max", "mean_max", "mean_max_logdeg", "rich"}
-    if cfg.agg_type not in VALID_AGGS:
-        raise NotImplementedError(
-            f"agg_type {cfg.agg_type!r} não suportado. Válidos: {sorted(VALID_AGGS)}."
+    from graphids.models.sampling import AGG_TYPES
+
+    if cfg.agg_type not in AGG_TYPES:
+        raise ValueError(
+            f"agg_type={cfg.agg_type!r} inválido. O artigo usa 'mean' (Tabela 14); "
+            f"as variantes da ablação são {AGG_TYPES}."
         )
     return cfg

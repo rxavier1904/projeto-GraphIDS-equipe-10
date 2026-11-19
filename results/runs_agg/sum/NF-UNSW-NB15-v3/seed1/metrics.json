@@ -1,0 +1,15 @@
+{
+  "dataset": "NF-UNSW-NB15-v3",
+  "seed": 1,
+  "test_pr_auc": 0.9596356790872542,
+  "test_f1_macro": 0.9496926975971651,
+  "val_best_pr_auc": 0.9590926306206868,
+  "threshold": 8.618823691694914,
+  "best_epoch": 31,
+  "train_time_s": 204.75219167023897,
+  "inference_us_per_sample": 0.3083238736903302,
+  "peak_gpu_mem_mb": 902.18359375,
+  "num_params": 99778,
+  "agg_type": "sum",
+  "git_commit": "c5920aa"
+}
