@@ -35,7 +35,8 @@ from graphids.training.trainer import (
 
 
 def run_dir(cfg: Config) -> Path:
-    return Path(cfg.output_dir) / cfg.dataset / f"seed{cfg.seed}"
+    folder = cfg.run_name if cfg.run_name else cfg.dataset
+    return Path(cfg.output_dir) / folder / f"seed{cfg.seed}"
 
 
 def git_commit() -> str:
@@ -116,12 +117,12 @@ def run_experiment(
         threshold, _ = best_f1_threshold(val.scores, val.labels, cfg.threshold_steps)
 
     test_graph = splits.test.to(device)
-    test = evaluate(
-        model, make_sampler(test_graph, cfg, splits), cfg, seed=cfg.seed
-    )
+    test = evaluate(model, make_sampler(test_graph, cfg, splits), cfg, seed=cfg.seed)
     preds = (test.scores > threshold).astype(int)
     metrics = {
         "dataset": cfg.dataset,
+        "run_name": run_dir(cfg).parent.name,
+        "agg_type": cfg.agg_type,
         "seed": cfg.seed,
         "test_pr_auc": test.pr_auc,
         "test_f1_macro": float(
@@ -136,7 +137,6 @@ def run_experiment(
             torch.cuda.max_memory_allocated() / 2**20 if device.type == "cuda" else 0.0
         ),
         "num_params": model.num_parameters(),
-        "agg_type": cfg.agg_type,
         "git_commit": git_commit(),
     }
     save_scores(out / "scores_val.npz", val, splits.val.attack_names)

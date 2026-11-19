@@ -8,6 +8,9 @@ Lê todos os ``results/runs/<dataset>/seed<s>/metrics.json`` (contrato C2) e gra
 - ``tabela_custo.csv`` / ``.tex``: parâmetros, tempo de treino, inferência por
   amostra e pico de memória da GPU (para comparar com as Tabelas 2 e 4).
 
+Execuções com ``agg_type`` diferente de ``mean`` (ablações de agregador) são
+ignoradas; elas são comparadas em ``scripts/compare_aggregators.py``.
+
 Uso:
     python scripts/aggregate_results.py                       # padrões abaixo
     python scripts/aggregate_results.py --runs results/runs --out results
@@ -62,6 +65,10 @@ def load_runs(runs_dir: str | Path) -> pd.DataFrame:
     for path in sorted(Path(runs_dir).glob("*/seed*/metrics.json")):
         with open(path, encoding="utf-8") as f:
             metrics = json.load(f)
+        # Ablações de agregador (agg_type != "mean", ver compare_aggregators.py)
+        # ficam fora das tabelas de reprodução do artigo.
+        if metrics.get("agg_type", "mean") != "mean":
+            continue
         metrics["path"] = str(path)
         rows.append(metrics)
     return pd.DataFrame(rows)

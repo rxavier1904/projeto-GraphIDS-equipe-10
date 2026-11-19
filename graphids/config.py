@@ -33,7 +33,7 @@ class Config:
     edim_out: int = 64  # dimensão do embedding de cada fluxo (d_gnn)
     nhops: int = 1  # o artigo usa só 1 hop (Apêndice C.5)
     fanout: int = 32768  # máximo de arestas de entrada amostradas por nó (-1 = todas)
-    agg_type: str = "mean"  # mean (artigo) | wmean | max | sum | mean_max (ablação)
+    agg_type: str = "mean"  # mean (artigo); ablação: ver sampling.AGG_TYPES
     gnn_dropout: float = 0.5
     # Poda da vizinhança (ablação): fluxos com bytes abaixo deste percentil do
     # treino não entram na agregação dos hosts, mas continuam sendo avaliados.
@@ -63,6 +63,7 @@ class Config:
     # --- Execução ---
     device: str = "auto"  # "auto", "cpu" ou "cuda"
     output_dir: str = "results/runs"
+    run_name: str | None = None  # subpasta de saída (padrão: nome do dataset)
     extra: dict[str, Any] = field(default_factory=dict)
 
     def data_config(self) -> DataConfig:

@@ -22,7 +22,8 @@ agregação, usadas só na ablação de agregação (fora da Tabela 14):
 - ``sum``: soma das arestas de entrada, comprimida com ``sign(x)·log1p(|x|)``
   para não explodir em hosts com milhões de fluxos. Com fanout, a soma é
   estimada como média amostrada × grau de entrada;
-- ``mean_max``: concatenação ``[média ‖ máximo]`` (dobra a dimensão do host).
+- ``mean_max``: concatenação ``[média ‖ máximo]`` (dobra a dimensão do host);
+- ``rich`` (= ``mean_max_logdeg``): ``[média ‖ máximo ‖ log(1 + grau de entrada)]``.
 """
 
 from __future__ import annotations
@@ -32,15 +33,19 @@ import torch
 
 from graphids.data.types import FlowGraph, GraphSplits
 
-AGG_TYPES = ("mean", "wmean", "max", "sum", "mean_max")
+AGG_TYPES = ("mean", "wmean", "max", "sum", "mean_max", "mean_max_logdeg", "rich")
 BYTE_FEATURES = ("IN_BYTES", "OUT_BYTES")
 
 
-def agg_dim_multiplier(agg_type: str) -> int:
-    """Quantas vezes F tem o vetor agregado de cada host."""
-    if agg_type not in AGG_TYPES:
-        raise ValueError(f"agg_type desconhecido: {agg_type!r} (opções: {AGG_TYPES})")
-    return 2 if agg_type == "mean_max" else 1
+def agg_node_dim(in_features: int, agg_type: str) -> int:
+    """Dimensão do vetor agregado de cada host para ``in_features`` features."""
+    if agg_type in {"mean", "wmean", "max", "sum"}:
+        return in_features
+    if agg_type == "mean_max":
+        return 2 * in_features
+    if agg_type in {"mean_max_logdeg", "rich"}:
+        return 2 * in_features + 1
+    raise ValueError(f"agg_type desconhecido: {agg_type!r} (opções: {AGG_TYPES})")
 
 
 def _bytes(graph: FlowGraph, feature_names: list[str]) -> torch.Tensor:
@@ -113,7 +118,7 @@ class NeighborhoodSampler:
         edge_weight: torch.Tensor | None = None,
         edge_mask: torch.Tensor | None = None,
     ) -> None:
-        agg_dim_multiplier(agg_type)  # valida o nome
+        agg_node_dim(1, agg_type)  # valida o nome
         if agg_type == "wmean" and edge_weight is None:
             raise ValueError(
                 "agg_type='wmean' precisa de edge_weight (use make_sampler)"
@@ -156,26 +161,37 @@ class NeighborhoodSampler:
         total.index_add_(0, dst, attr)
         self.full_mean = total / deg
 
+        # Máximo e log do grau, quando a variante usa (nós sem arestas: zero).
+        self.full_max = None
+        if agg_type in {"max", "mean_max", "mean_max_logdeg", "rich"}:
+            self.full_max = torch.zeros_like(total)
+            self.full_max.scatter_reduce_(
+                0, dst.unsqueeze(1).expand_as(attr), attr, "amax", include_self=False
+            )
+        self.log_degree = None
+        if agg_type in {"mean_max_logdeg", "rich"}:
+            self.log_degree = torch.log1p(in_degree.to(attr.dtype)).unsqueeze(1)
+
         # Agregação completa da variante escolhida (= full_mean no padrão).
         if agg_type == "mean":
-            self.full_agg = self.full_mean
+            self.full_feats = self.full_mean
         elif agg_type == "wmean":
             w = w_kept.to(device=device, dtype=attr.dtype)
             num = torch.zeros_like(total).index_add_(0, dst, attr * w.unsqueeze(1))
             den = torch.zeros(n, device=device, dtype=attr.dtype).index_add_(0, dst, w)
-            self.full_agg = num / den.clamp(min=1e-12).unsqueeze(1)
+            self.full_feats = num / den.clamp(min=1e-12).unsqueeze(1)
         elif agg_type == "sum":
-            self.full_agg = _slog(total)
-        else:
-            full_max = torch.zeros_like(total)
-            full_max.scatter_reduce_(
-                0, dst.unsqueeze(1).expand_as(attr), attr, "amax", include_self=False
+            self.full_feats = _slog(total)
+        elif agg_type == "max":
+            self.full_feats = self.full_max
+        elif agg_type == "mean_max":
+            self.full_feats = torch.cat([self.full_mean, self.full_max], dim=1)
+        else:  # mean_max_logdeg / rich
+            self.full_feats = torch.cat(
+                [self.full_mean, self.full_max, self.log_degree], dim=1
             )
-            self.full_agg = (
-                full_max
-                if agg_type == "max"
-                else torch.cat([self.full_mean, full_max], dim=1)
-            )
+        self.full_agg = self.full_feats  # nome antigo, mantido por compatibilidade
+        self.node_dim = self.full_feats.shape[1]
 
         if fanout > 0:
             self.heavy = torch.nonzero(in_degree > fanout).flatten()
@@ -203,18 +219,21 @@ class NeighborhoodSampler:
             return _slog(x.mean(0) * self.in_degree[node].to(x.dtype))
         if self.agg_type == "max":
             return x.amax(0)
-        return torch.cat([x.mean(0), x.amax(0)])
+        if self.agg_type == "mean_max":
+            return torch.cat([x.mean(0), x.amax(0)])
+        # rich: o log do grau usa o grau completo, não o da amostra
+        return torch.cat([x.mean(0), x.amax(0), self.log_degree[node]])
 
     def node_features(
         self, nodes: torch.Tensor, generator: torch.Generator | None = None
     ) -> torch.Tensor:
         """Agregação das arestas de entrada de cada nó de ``nodes``.
 
-        Devolve ``[len(nodes), F]`` (``[len(nodes), 2F]`` em ``mean_max``).
+        Devolve ``[len(nodes), node_dim]``.
         Nós com grau de entrada até o ``fanout`` usam a agregação pré-calculada;
         os demais são reamostrados a cada chamada.
         """
-        feats = self.full_agg[nodes]
+        feats = self.full_feats[nodes].clone()
         heavy_pos = torch.nonzero(self._is_heavy[nodes]).flatten()
         for pos in heavy_pos.tolist():
             node = int(nodes[pos])
@@ -226,7 +245,7 @@ class NeighborhoodSampler:
         """Prepara um mini-batch de fluxos para o E-GraphSAGE.
 
         Returns:
-            node_feats: [N_b, F], média de entrada dos hosts envolvidos no batch.
+            node_feats: [N_b, node_dim], agregação dos hosts envolvidos no batch.
             src_pos, dst_pos: [B], posição da origem e do destino de cada fluxo
                 dentro de ``node_feats``.
         """
