@@ -5,7 +5,7 @@
 #
 # Resultado: <data_dir>/<dataset>/<dataset>.csv, que é o caminho esperado por
 # graphids/data/loading.py, e <data_dir>/MANIFEST.tsv com o tamanho e o SHA-256
-# de cada zip e de cada CSV (registrar no docs/SERVIDOR.md).
+# de cada zip e de cada CSV.
 #
 # Os links da UQ (rdm.uq.edu.au/files/<id>) abrem uma página HTML, não o arquivo.
 # Por isso o script aceita dois caminhos:

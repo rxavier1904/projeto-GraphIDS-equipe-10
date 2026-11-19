@@ -1,6 +1,6 @@
 """Estruturas de dados trocadas entre o pipeline de dados (F2) e o modelo (F1).
 
-Este arquivo É o contrato C1 (ver docs/CONTRATOS.md). Usamos PyTorch puro, sem
+Este arquivo é o contrato C1 entre dados e modelo. Usamos PyTorch puro, sem
 PyTorch Geometric, para simplificar a instalação no servidor do CIn.
 """
 

@@ -4,7 +4,7 @@ Lê todos os ``results/runs/<dataset>/seed<s>/metrics.json`` (contrato C2) e gra
 
 - ``tabela_reproducao.csv`` / ``.tex``: média ± desvio de PR-AUC e F1 macro no
   teste, lado a lado com a Tabela 3 do artigo, com a diferença e se a nossa
-  média ficou a até 2 desvios do valor publicado (critério do PLANO.md, seção 2);
+  média ficou a até 2 desvios do valor publicado (nosso critério de reprodução);
 - ``tabela_custo.csv`` / ``.tex``: parâmetros, tempo de treino, inferência por
   amostra e pico de memória da GPU (para comparar com as Tabelas 2 e 4).
 

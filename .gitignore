@@ -15,7 +15,8 @@ venv/
 *.zip
 *.ckpt
 *.pt
-results/runs/**/scores_*.npz
+results/runs*/**/scores_*.npz
+results/smoke/
 wandb/
 
 # Logs das rodadas no servidor (F3)

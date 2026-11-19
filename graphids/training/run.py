@@ -23,7 +23,7 @@ from sklearn.metrics import f1_score
 from graphids.config import Config
 from graphids.data import load_splits
 from graphids.models.graphids import GraphIDS
-from graphids.models.sampling import NeighborhoodSampler
+from graphids.models.sampling import make_sampler
 from graphids.training.threshold import best_f1_threshold
 from graphids.training.trainer import (
     EvalResult,
@@ -108,7 +108,7 @@ def run_experiment(
     # threshold (no modo só-teste, ele é recalculado a partir desses scores).
     val = evaluate(
         model,
-        NeighborhoodSampler(splits.val.to(device), cfg.fanout),
+        make_sampler(splits.val.to(device), cfg, splits),
         cfg,
         seed=cfg.seed,
     )
@@ -117,7 +117,7 @@ def run_experiment(
 
     test_graph = splits.test.to(device)
     test = evaluate(
-        model, NeighborhoodSampler(test_graph, cfg.fanout), cfg, seed=cfg.seed
+        model, make_sampler(test_graph, cfg, splits), cfg, seed=cfg.seed
     )
     preds = (test.scores > threshold).astype(int)
     metrics = {
@@ -136,6 +136,7 @@ def run_experiment(
             torch.cuda.max_memory_allocated() / 2**20 if device.type == "cuda" else 0.0
         ),
         "num_params": model.num_parameters(),
+        "agg_type": cfg.agg_type,
         "git_commit": git_commit(),
     }
     save_scores(out / "scores_val.npz", val, splits.val.attack_names)

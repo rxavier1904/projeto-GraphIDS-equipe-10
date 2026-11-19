@@ -1,0 +1,15 @@
+{
+  "dataset": "NF-CSE-CIC-IDS2018-v2",
+  "seed": 1,
+  "test_pr_auc": 0.8441530665356349,
+  "test_f1_macro": 0.8221840670935294,
+  "val_best_pr_auc": 0.8233571107428403,
+  "threshold": 0.627706256010131,
+  "best_epoch": 20,
+  "train_time_s": 220.91876664198935,
+  "inference_us_per_sample": 0.37788593567959566,
+  "peak_gpu_mem_mb": 1103.60302734375,
+  "num_params": 57562,
+  "agg_type": "max",
+  "git_commit": "c5920aa"
+}

@@ -9,7 +9,7 @@ Para um fluxo u -> v:
 Assim cada fluxo carrega o contexto local (1 hop) dos dois hosts que ele liga.
 A feature do próprio nó não entra (os nós não têm atributos nos datasets NetFlow),
 e o fluxo só influencia o próprio embedding pela agregação em v. As duas
-escolhas seguem o código oficial (ver docs/REFERENCIA-CODIGO-OFICIAL.md).
+escolhas seguem o código oficial (github.com/lorenzo9uerra/GraphIDS).
 """
 
 from __future__ import annotations
@@ -25,11 +25,19 @@ class EGraphSAGE(nn.Module):
         in_features: número de features de cada fluxo (F).
         out_features: dimensão do embedding do fluxo (``edim_out``).
         dropout: dropout aplicado no embedding final (até 0.75 na Tabela 14).
+        agg_mult: a agregação do host tem ``agg_mult * F`` dimensões (2 em
+            ``mean_max``, 1 nas demais). A saída de ``fc_neigh`` continua F.
     """
 
-    def __init__(self, in_features: int, out_features: int, dropout: float = 0.0):
+    def __init__(
+        self,
+        in_features: int,
+        out_features: int,
+        dropout: float = 0.0,
+        agg_mult: int = 1,
+    ):
         super().__init__()
-        self.fc_neigh = nn.Linear(in_features, in_features)
+        self.fc_neigh = nn.Linear(agg_mult * in_features, in_features)
         self.fc_edge = nn.Linear(2 * in_features, out_features)
         self.dropout = nn.Dropout(dropout)
         self.reset_parameters()
@@ -47,7 +55,7 @@ class EGraphSAGE(nn.Module):
         """Calcula os embeddings dos fluxos de um mini-batch.
 
         Args:
-            node_feats: [N_b, F], média das arestas de entrada de cada host
+            node_feats: [N_b, agg_mult*F], agregação das arestas de entrada de cada host
                 (vem de ``NeighborhoodSampler.batch``).
             src_pos, dst_pos: [B], índices da origem e do destino em ``node_feats``.
 
