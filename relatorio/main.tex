@@ -4,7 +4,9 @@
 % Compilação (na pasta relatorio/):
 %   latexmk -pdf main.tex
 % As tabelas em tabelas/ são geradas por gerar_tabelas.py a partir de results/.
-\documentclass[conference,a4paper]{IEEEtran}
+\documentclass[conference]{IEEEtran}
+% Formatação conforme o template de relatório de projeto da disciplina
+% (IEEEtran conference, carta, algorithm + algpseudocode).
 
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
@@ -15,12 +17,28 @@
 \usepackage{multirow}
 \usepackage{makecell}
 \usepackage{xcolor}
-\usepackage[portuguese,ruled,vlined,linesnumbered]{algorithm2e}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,fit,backgrounds}
 \usepackage{cite}
 \usepackage{url}
 \usepackage[hidelinks]{hyperref}
+
+\addto\captionsbrazil{\renewcommand\refname{Referências}}
+\floatname{algorithm}{Algoritmo}
+\algrenewcommand\algorithmicrequire{\textbf{Entrada:}}
+\algrenewcommand\algorithmicensure{\textbf{Saída:}}
+\algrenewcommand\algorithmicfor{\textbf{para}}
+\algrenewcommand\algorithmicforall{\textbf{para cada}}
+\algrenewcommand\algorithmicdo{\textbf{faça}}
+\algrenewcommand\algorithmicend{\textbf{fim}}
+\algrenewcommand\algorithmicif{\textbf{se}}
+\algrenewcommand\algorithmicthen{\textbf{então}}
+\algnotext{EndFor}
+\algnotext{EndIf}
+
+\hyphenation{op-tical net-works semi-conduc-tor}
 
 \graphicspath{{figuras/}}
 \renewcommand{\topfraction}{0.9}
@@ -36,10 +54,21 @@
 
 \title{Reprodução e Avaliação do GraphIDS: Detecção Auto-Supervisionada de Intrusão em Rede com Grafos}
 
-\author{
-\IEEEauthorblockN{Bernardo Siqueira Batista, Danilo Regino Barrote, Felipe Maran Alves e Rafael Mendes Bezerra Xavier}
-\IEEEauthorblockA{Centro de Informática, Universidade Federal de Pernambuco, Recife, Brasil\\
-CIN0114 -- Técnicas de Ataque e Detecção de Intrusão, 2026.2 -- Equipe 10}
+\author{\IEEEauthorblockN{1\textsuperscript{st} Bernardo Siqueira Batista}
+\IEEEauthorblockA{\textit{Centro de Informática - UFPE} \\
+Recife, Brazil}
+\and
+\IEEEauthorblockN{2\textsuperscript{nd} Danilo Regino Barrote}
+\IEEEauthorblockA{\textit{Centro de Informática - UFPE} \\
+Recife, Brazil}
+\and
+\IEEEauthorblockN{3\textsuperscript{rd} Felipe Maran Alves}
+\IEEEauthorblockA{\textit{Centro de Informática - UFPE} \\
+Recife, Brazil}
+\and
+\IEEEauthorblockN{4\textsuperscript{th} Rafael Mendes Bezerra Xavier}
+\IEEEauthorblockA{\textit{Centro de Informática - UFPE} \\
+Recife, Brazil}
 }
 
 \maketitle
@@ -68,6 +97,8 @@ de algumas categorias, mas nenhum supera a média na PR-AUC.
 detecção de intrusão, redes neurais de grafos, aprendizado auto-supervisionado,
 autoencoder mascarado, NetFlow
 \end{IEEEkeywords}
+
+\IEEEpeerreviewmaketitle
 
 % ----------------------------------------------------------------------------
 \section{Introdução}
@@ -273,23 +304,25 @@ validação, e é aplicado ao teste sem consultá-lo.
 \small
 \caption{Treino do GraphIDS}
 \label{alg:treino}
-\KwIn{grafos de treino (benigno) e de validação}
-\KwOut{parâmetros $\theta$ e limiar $\tau^\ast$}
-\For{época $=1,\dots,100$}{
-  \ForEach{lote de arestas do treino}{
-    $\vect{h}\leftarrow$ E-GraphSAGE com vizinhança amostrada\;
-    agrupar em janelas de 512 e sortear a máscara $\vect{M}$\;
-    $\hat{\vect{h}}\leftarrow$ Transformer$(\vect{h};\vect{M})$\;
-    atualizar GNN e Transformer com $\nabla\mathcal{L}_{MSE}$ (AdamW)\;
-  }
-  salvar $\theta$ se a PR-AUC de validação melhorou\;
-  \lIf{20 épocas sem melhora}{parar}
-}
-$\tau^\ast\leftarrow\arg\max_\tau \mathrm{F1}_{macro}$ na validação\;
+\begin{algorithmic}[1]
+\Require grafos de treino (benigno) e de validação
+\Ensure parâmetros $\theta$ e limiar $\tau^\ast$
+\For{época $=1,\dots,100$}
+  \ForAll{lote de arestas do treino}
+    \State $\vect{h}\leftarrow$ E-GraphSAGE com vizinhança amostrada
+    \State agrupar em janelas de 512 e sortear a máscara $\vect{M}$
+    \State $\hat{\vect{h}}\leftarrow$ Transformer$(\vect{h};\vect{M})$
+    \State atualizar GNN e Transformer com $\nabla\mathcal{L}_{MSE}$ (AdamW)
+  \EndFor
+  \State salvar $\theta$ se a PR-AUC de validação melhorou
+  \If{20 épocas sem melhora} parar \EndIf
+\EndFor
+\State $\tau^\ast\leftarrow\arg\max_\tau \mathrm{F1}_{macro}$ na validação
+\end{algorithmic}
 \end{algorithm}
 
 % ----------------------------------------------------------------------------
-\section{Solução proposta pela equipe}
+\section{Solução proposta pela equipe para melhorar a solução do artigo de referência}
 \label{sec:proposta}
 
 \textbf{O que se espera melhorar.} No NF-ToN-IoT-v3, varreduras e ataques
@@ -317,7 +350,7 @@ passa de 99.778 para no máximo 102.228 parâmetros.
 % ----------------------------------------------------------------------------
 \section{Metodologia}
 
-\subsection{Dados do artigo de referência}
+\subsection{Dados usados pelo artigo de referência}
 
 O artigo usa as versões NetFlow do UNSW-NB15~\cite{moustafa2015unsw} e do
 CSE-CIC-IDS2018~\cite{sharafaldin2018cicids}, publicadas pela Universidade de
@@ -372,7 +405,7 @@ fluxos.
 \input{tabelas/contagens_cic.tex}
 \end{table*}
 
-\subsection{Outro conjunto de dados: NF-ToN-IoT-v3}
+\subsection{Novo conjunto de dados escolhido}
 
 Escolhemos o NF-ToN-IoT-v3, versão NetFlow do TON\_IoT~\cite{moustafa2021toniot},
 por três motivos: tem as mesmas 53 features v3, então o pipeline roda sem
@@ -402,10 +435,6 @@ ou menos (Figura~\ref{fig:cauda}).
 \input{tabelas/contagens_ton.tex}
 \end{table}
 
-
-
-
-
 \begin{table}[!t]
 \centering
 \caption{Custo computacional (média $\pm$ desvio), comparado com a Tabela 2 do artigo. A memória de GPU ficou entre 0,9 e 1,3 GB.}
@@ -415,7 +444,7 @@ ou menos (Figura~\ref{fig:cauda}).
 \input{tabelas/custo.tex}
 \end{table}
 
-\subsection{Métricas e experimentos}
+\subsection{Métricas de avaliação}
 
 Usamos as métricas do artigo: PR-AUC (\emph{average precision},
 $\mathrm{AP}=\sum_k(R_k-R_{k-1})P_k$) e F1 macro no limiar $\tau^\ast$, além da
@@ -443,7 +472,9 @@ com as mesmas seeds e hiperparâmetros, mudando só o agregador.
 
 \section{Resultados e discussões}
 
-\subsection{Solução do artigo nos dados do artigo}
+\subsection{Resultados da reprodução do artigo de referência}
+
+\subsubsection{Nos dados usados pelo artigo de referência}
 
 A Tabela~\ref{tab:reproducao} compara nossa reprodução com o artigo e seus
 baselines. O critério é atendido em 7 das 8 métricas. A exceção é a PR-AUC do
@@ -492,7 +523,7 @@ memória de GPU semelhante e inferência de 0,24 a 0,82~$\mu$s por fluxo (2,27 a
 5,09~$\mu$s no artigo). Não identificamos a causa da diferença de
 parâmetros, mas ela não afetou o desempenho.
 
-\subsection{Solução do artigo no NF-ToN-IoT-v3}
+\subsubsection{No novo conjunto de dados escolhido}
 \label{sec:res_ton}
 
 O GraphIDS obtém PR-AUC de $0{,}6872\pm0{,}0192$ e F1 macro de
@@ -533,9 +564,10 @@ brutas e muito mais misturadas nos embeddings. (3) \emph{Sem ajuste de
 hiperparâmetros}, ao contrário do artigo, que otimiza cada dataset. A alta
 prevalência de ataques também enfraquece a premissa de que anomalias são raras.
 
-\subsection{Proposta da equipe}
+\subsection{Resultados da proposta de melhoria do artigo de referência}
 
-\textbf{Nos dados do artigo.} A proposta não foi avaliada nos quatro datasets do
+\subsubsection{Nos dados usados pelo artigo de referência}
+A proposta não foi avaliada nos quatro datasets do
 artigo, então não há resultados nesse cenário.
 
 \begin{table}[!t]
@@ -554,8 +586,9 @@ artigo, então não há resultados nesse cenário.
 \label{fig:agregadores}
 \end{figure*}
 
-\textbf{No NF-ToN-IoT-v3} (Tabela~\ref{tab:agregadores} e
-Figura~\ref{fig:agregadores}). Nenhum agregador supera a média na PR-AUC: o rico
+\subsubsection{No novo conjunto de dados escolhido}
+Tabela~\ref{tab:agregadores} e
+Figura~\ref{fig:agregadores}. Nenhum agregador supera a média na PR-AUC: o rico
 chega a 0,5755, contra 0,6872, e o máximo e a média + máximo ficam abaixo de
 0,55. No F1 macro, o rico empata com a média (0,6411 contra 0,6408), com desvio
 três vezes menor. Por categoria, a proposta cumpre parte do esperado: o máximo
@@ -573,7 +606,7 @@ em média (5,4 com a média), a inferência fica entre 0,56 e 0,63~$\mu$s por
 fluxo (0,82 com a média) e o pico de memória da GPU, perto de 1,18~GB em todos.
 
 % ----------------------------------------------------------------------------
-\section{Conclusão e trabalhos futuros}
+\section{Conclusões e trabalhos futuros}
 \label{sec:conclusao}
 
 Reimplementamos o GraphIDS e reproduzimos seus resultados nos quatro datasets do
