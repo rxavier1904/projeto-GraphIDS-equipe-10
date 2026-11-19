@@ -369,6 +369,49 @@ def tabela_agregadores() -> None:
     gravar("agregadores", out)
 
 
+ABLACAO = [
+    ("mean", "média (artigo)"),
+    ("wmean", "média ponderada"),
+    ("sum", "soma"),
+    ("max", "máximo"),
+    ("mean_max", "média + máx."),
+]
+
+
+def tabela_ablacao() -> None:
+    """Ablação de agregação (Bernardo): cinco datasets, seed 1."""
+    linhas = ler_csv(RESULTS / "tabela_agregacao.csv")
+    res = {(r["dataset"], r["agg_type"]): r for r in linhas}
+    datasets = [*ARTIGO, NOVO]
+    melhor = {
+        (d, k): max(float(res[d, a][k]) for a, _ in ABLACAO)
+        for d in datasets
+        for k in ("test_pr_auc", "test_f1_macro")
+    }
+    cab = " & ".join(rf"\multicolumn{{2}}{{c}}{{{CURTO[d]}}}" for d in datasets)
+    regras = "".join(
+        rf"\cmidrule(lr){{{2 + 2 * i}-{3 + 2 * i}}}" for i in range(len(datasets))
+    )
+    out = [
+        r"\begin{tabular}{l" + "cc" * len(datasets) + "}",
+        r"\toprule",
+        f"& {cab} \\\\",
+        regras,
+        "Agregador & " + " & ".join(["PR-AUC & F1"] * len(datasets)) + r" \\",
+        r"\midrule",
+    ]
+    for agg, nome in ABLACAO:
+        cel = []
+        for d in datasets:
+            for k in ("test_pr_auc", "test_f1_macro"):
+                v = float(res[d, agg][k])
+                txt = br(v)
+                cel.append(rf"\textbf{{{txt}}}" if v == melhor[d, k] else txt)
+        out.append(f"{nome} & " + " & ".join(cel) + r" \\")
+    out += [r"\bottomrule", r"\end{tabular}"]
+    gravar("ablacao", out)
+
+
 def tabela_custo() -> None:
     nosso = {r["dataset"]: r for r in ler_csv(RESULTS / "tabela_custo.csv")}
     out = [
@@ -407,6 +450,7 @@ def main() -> None:
     tabela_deteccao("deteccao_ton", [NOVO])
     tabela_custo()
     tabela_agregadores()
+    tabela_ablacao()
     print(f"Tabelas gravadas em {SAIDA}")
 
 

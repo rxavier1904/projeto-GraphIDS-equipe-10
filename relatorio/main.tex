@@ -352,6 +352,27 @@ logarítmica por causa da cauda longa de graus do dataset
 máximo e o grau são pré-calculados por host, o custo extra é pequeno: o modelo
 passa de 99.778 para no máximo 102.228 parâmetros.
 
+\textbf{Ablação de agregação nos cinco datasets.} Para saber se o ganho depende
+do dataset, avaliamos também a troca do agregador nos quatro datasets do artigo
+e no NF-ToN-IoT-v3. Além do máximo e da média + máximo, testamos duas variantes
+que mantêm a dimensão do host. A média ponderada dá mais peso aos fluxos com
+mais bytes, $b_{zw}$ (\texttt{IN\_BYTES} + \texttt{OUT\_BYTES}), relativos à
+mediana $\tilde{b}$ do treino:
+\begin{align}
+\vect{a}^{\mathrm{pond}}_w&=\frac{\sum_{(z,w)\in\mathcal{N}_K(w)} \omega_{zw}\,\vect{x}_{zw}}{\sum_{(z,w)\in\mathcal{N}_K(w)} \omega_{zw}},\\
+\omega_{zw}&=\log\left(1+b_{zw}/\tilde{b}\right).
+\end{align}
+A soma preserva o volume de tráfego do host e é comprimida em escala
+logarítmica, elemento a elemento, para não explodir nos hosts com milhões de
+fluxos:
+\begin{equation}
+\vect{a}^{\mathrm{soma}}_w=\mathrm{sign}(\vect{s}_w)\log\left(1+|\vect{s}_w|\right),\qquad
+\vect{s}_w=\sum_{(z,w)\in E} \vect{x}_{zw}.
+\end{equation}
+Com vizinhança amostrada, $\vect{s}_w$ é estimada como a média amostrada vezes
+$d^{-}(w)$. Cada variante rodou só com a seed~1, com os hiperparâmetros da
+média.
+
 % ----------------------------------------------------------------------------
 \section{Metodologia}
 
@@ -572,8 +593,25 @@ prevalência de ataques também enfraquece a premissa de que anomalias são rara
 \subsection{Resultados da proposta de melhoria do artigo de referência}
 
 \subsubsection{Nos dados usados pelo artigo de referência}
-A proposta não foi avaliada nos quatro datasets do
-artigo, então não há resultados nesse cenário.
+O agregador rico não foi avaliado nos quatro datasets do
+artigo; a ablação de agregação, sim, com a seed~1 (Tabela~\ref{tab:ablacao}). A
+média do artigo é a melhor no NF-UNSW-NB15-v3 e no NF-CSE-CIC-IDS2018-v2, e
+nenhuma variante a supera de forma consistente. O caso de destaque é a soma no
+NF-CSE-CIC-IDS2018-v3: PR-AUC de 0,9536, acima das três seeds da média (0,8351 a
+0,9324), com o Bot detectado em 100\% (0,05\% com a média) e FPR de 0,09\%
+(3,0\% com a média), mas com a Infiltration caindo de 24\% para 4\%. No
+NF-UNSW-NB15-v2, o máximo (0,7848) supera a média da seed~1 (0,6275), mas fica
+abaixo das outras duas seeds da média (0,8153 e 0,8606), ou seja, dentro da
+variância entre seeds. Com uma só seed, essas diferenças são indícios, não
+conclusões.
+
+\begin{table*}[!t]
+\centering
+\caption{Ablação de agregação do E-GraphSAGE nos cinco datasets (seed 1, hiperparâmetros da média). Em negrito, o melhor valor de cada coluna.}
+\label{tab:ablacao}
+\footnotesize
+\input{tabelas/ablacao.tex}
+\end{table*}
 
 \begin{table}[!t]
 \centering
@@ -610,6 +648,15 @@ detecção. O custo praticamente não muda: o treino leva de 3,5 a 6,6 minutos
 em média (5,4 com a média), a inferência fica entre 0,56 e 0,63~$\mu$s por
 fluxo (0,82 com a média) e o pico de memória da GPU, perto de 1,18~GB em todos.
 
+Na ablação com a seed~1 (Tabela~\ref{tab:ablacao}), a média também é a melhor
+no NF-ToN-IoT-v3 (PR-AUC de 0,6651), seguida do máximo (0,6308), da soma
+(0,5738), da média ponderada (0,5449) e da média + máximo (0,4820). A soma eleva
+o scanning de 11\% para 32\% e o DDoS de 84\% para 96\%, mas zera backdoor e
+ransomware; a média ponderada mantém os dois em 100\%, mas derruba MITM e DoS
+para menos de 20\%. Nenhuma variante resolve as categorias difíceis sem perder
+outras, o que reforça que o limite no NF-ToN-IoT-v3 não está só na função de
+agregação.
+
 % ----------------------------------------------------------------------------
 \section{Conclusões e trabalhos futuros}
 \label{sec:conclusao}
@@ -618,7 +665,10 @@ Reimplementamos o GraphIDS e reproduzimos seus resultados nos quatro datasets do
 artigo, com 7 das 8 métricas a até dois desvios-padrão e com um modelo menor e
 mais rápido. No NF-ToN-IoT-v3, o desempenho cai bastante (PR-AUC de 0,6872). A
 proposta de agregadores ricos melhora a detecção de XSS, injection, password e
-scanning, mas piora outras categorias e não supera a média na PR-AUC.
+scanning, mas piora outras categorias e não supera a média na PR-AUC. Na
+ablação de agregação nos cinco datasets (seed~1), a média segue como a melhor
+escolha geral; só a soma no NF-CSE-CIC-IDS2018-v3 tem ganho claro, que precisa
+ser confirmado com mais seeds.
 
 As limitações da proposta são: foi avaliada só no NF-ToN-IoT-v3 e com os
 hiperparâmetros da média, e o máximo é sensível a fluxos extremos isolados.
